@@ -28,7 +28,7 @@ function ArticleScreen() {
       <div style={{
         position: 'absolute', top: 70, bottom: 0, left: 0, right: 0,
         overflowY: 'auto',
-        padding: '0 18px 100px',
+        padding: '0 18px 32px',
       }}>
         <div style={{
           height: 150, borderRadius: 20,
@@ -131,49 +131,28 @@ function ArticleScreen() {
           </div>
         </div>
 
-        <div style={{ marginTop: 16 }}>
-          <button
-            onClick={() => navigate('chat')}
-            style={{
-              width: '100%',
-              background: '#fff',
-              border: `1.5px solid ${DL.border}`,
-              borderRadius: 18,
-              padding: '14px 16px',
-              display: 'flex', alignItems: 'center', gap: 12,
-              cursor: 'pointer',
-              fontFamily: DL.fontJp,
-              textAlign: 'left',
-              boxShadow: '0 3px 0 #F0E2CD',
-            }}>
-            <div style={{
-              width: 40, height: 40, borderRadius: 12,
-              background: DL.mint,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: '0 3px 0 #0F7A38',
-              flexShrink: 0,
-            }}>
-              <svg width="20" height="20" viewBox="0 0 22 22" fill="none">
-                <path d="M3 5 Q3 3 5 3 H17 Q19 3 19 5 V13 Q19 15 17 15 H10 L6 19 V15 H5 Q3 15 3 13 Z" fill="#fff"/>
-              </svg>
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 14, fontWeight: 900, color: DL.navy }}>わからないところを質問</div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: DL.slate, marginTop: 2 }}>
-                AIコーチに今すぐ聞く →
-              </div>
-            </div>
-            <svg width="18" height="18" viewBox="0 0 20 20" fill="none"><path d="M7 4 L13 10 L7 16" stroke={DL.mintDark} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg>
-          </button>
+        <div style={{ marginTop: 28 }}>
+          <PushButton color={DL.mint} shadow={DL.mintShadow} fontSize={16} onClick={() => navigate('home')}>
+            ✓ 読み終わった!
+          </PushButton>
         </div>
       </div>
 
-      <div style={{
-        position: 'absolute', bottom: 24, left: 16, right: 16, zIndex: 20,
-      }}>
-        <PushButton color={DL.mint} shadow={DL.mintShadow} fontSize={16} onClick={() => navigate('home')}>
-          ✓ 読み終わった!
-        </PushButton>
+      {/* Floating coach FAB — visible from any scroll position */}
+      <div
+        onClick={() => navigate('chat')}
+        title="AIコーチに質問"
+        style={{
+          position: 'absolute', bottom: 24, right: 18, zIndex: 25,
+          width: 58, height: 58, borderRadius: '50%',
+          background: DL.mint,
+          boxShadow: `0 5px 0 ${DL.mintShadow}, 0 10px 24px rgba(15,23,42,0.18)`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          cursor: 'pointer',
+        }}>
+        <svg width="28" height="28" viewBox="0 0 22 22" fill="none">
+          <path d="M3 5 Q3 3 5 3 H17 Q19 3 19 5 V13 Q19 15 17 15 H10 L6 19 V15 H5 Q3 15 3 13 Z" fill="#fff"/>
+        </svg>
       </div>
 
       <TabBar active="home"/>

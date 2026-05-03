@@ -119,6 +119,7 @@ function Node({ w, state, idx }) {
           boxShadow: `0 5px 0 ${c.sh}`,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           border: '4px solid #fff',
+          boxSizing: 'border-box',
           position: 'relative',
         }}>
           {c.icon === 'check' && (

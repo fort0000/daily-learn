@@ -16,9 +16,6 @@ function HomeScreen() {
       <StatusBar/>
       <div style={{ padding: '4px 20px 0', paddingRight: 76 }}>
         <div style={{ fontSize: 13, color: DL.slate, fontWeight: 700, letterSpacing: 0.5 }}>5月3日(金)</div>
-        <div style={{ fontSize: 22, fontWeight: 800, color: DL.navy, fontFamily: DL.fontJp, marginTop: 4, lineHeight: 1.2 }}>
-          おはよう、たけしさん 👋
-        </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 10, flexWrap: 'wrap' }}>
           <div style={{
             background: '#fff',
@@ -118,7 +115,7 @@ function LessonCarousel() {
       day: 13, status: 'tomorrow', eyebrow: '明日 (5/4)',
       title: ['顧客インタビュー', 'の作り方'],
       summary: '5人に聞くだけで仮説の8割は検証できる。質問リストを準備しよう。',
-      cta: '予習して始める',
+      cta: '今日の学びを始める →',
       color: DL.mint, shadow: DL.mintShadow,
       chip: { bg: '#DCFCE7', dot: DL.mint, fg: DL.mintDark, label: 'DAY 13 / 90' },
       blob: '#D1FAE5',
@@ -128,7 +125,7 @@ function LessonCarousel() {
       day: 14, status: 'soon', eyebrow: '5月5日(日)',
       title: ['価格設定の', 'やさしい考え方'],
       summary: 'コスト基準・市場基準・価値基準。3つの軸でブレずに値段を決める。',
-      cta: 'プレビュー',
+      cta: '今日の学びを始める →',
       color: '#A855F7', shadow: '#7E22CE',
       chip: { bg: '#EDE9FE', dot: '#A855F7', fg: '#6D28D9', label: 'DAY 14 / 90' },
       blob: '#EDE9FE',

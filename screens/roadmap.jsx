@@ -1,12 +1,12 @@
-// Screen 2 — Roadmap (90-day winding path)
+// Screen 2 — Roadmap (90-day winding path, one node per day)
 function RoadmapScreen() {
   const { navigate } = useNav();
-  const weeks = Array.from({ length: 12 }, (_, i) => {
-    const w = i + 1;
+  const days = Array.from({ length: 90 }, (_, i) => {
+    const d = i + 1;
     let state = 'future';
-    if (w <= 2) state = 'done';
-    else if (w === 3) state = 'current';
-    return { w, state };
+    if (d <= 11) state = 'done';
+    else if (d === 12) state = 'current';
+    return { d, state };
   });
 
   return (
@@ -48,14 +48,14 @@ function RoadmapScreen() {
         backgroundSize: '20px 20px',
       }}>
         <div style={{ padding: '18px 0 100px', position: 'relative' }}>
-          <PhaseLabel label="基礎編" sub="Week 1–4" color={DL.mint}/>
-          {weeks.slice(0, 4).map((w, i) => <Node key={w.w} {...w} idx={i}/>)}
+          <PhaseLabel label="基礎編" sub="Day 1–30" color={DL.mint}/>
+          {days.slice(0, 30).map((d, i) => <Node key={d.d} {...d} idx={i}/>)}
 
-          <PhaseLabel label="実践編" sub="Week 5–8" color={DL.primary} top/>
-          {weeks.slice(4, 8).map((w, i) => <Node key={w.w} {...w} idx={i + 4}/>)}
+          <PhaseLabel label="実践編" sub="Day 31–60" color={DL.primary} top/>
+          {days.slice(30, 60).map((d, i) => <Node key={d.d} {...d} idx={i + 30}/>)}
 
-          <PhaseLabel label="応用編" sub="Week 9–12" color="#A855F7" top/>
-          {weeks.slice(8, 12).map((w, i) => <Node key={w.w} {...w} idx={i + 8}/>)}
+          <PhaseLabel label="応用編" sub="Day 61–90" color="#A855F7" top/>
+          {days.slice(60, 90).map((d, i) => <Node key={d.d} {...d} idx={i + 60}/>)}
         </div>
       </div>
 
@@ -82,9 +82,9 @@ function PhaseLabel({ label, sub, color, top }) {
   );
 }
 
-function Node({ w, state, idx }) {
+function Node({ d, state, idx }) {
   const { navigate } = useNav();
-  const positions = [120, 200, 240, 200, 120, 60, 30, 60];
+  const positions = [110, 160, 200, 230, 240, 230, 200, 160, 110, 60, 30, 20, 30, 60];
   const left = positions[idx % positions.length];
 
   const colors = {
@@ -93,12 +93,15 @@ function Node({ w, state, idx }) {
     future: { bg: '#E5DCC8', sh: '#C9BFA8', icon: 'lock' },
   };
   const c = colors[state];
-  const size = state === 'current' ? 78 : 64;
+  const size = state === 'current' ? 56 : 44;
+  // Reduce label clutter on a 90-node path: show the Day label only on
+  // milestone days (every 10) and on the last completed day.
+  const showLabel = state !== 'current' && (d % 10 === 0 || d === 11 || d === 1);
 
   return (
-    <div style={{ position: 'relative', height: 92 }}>
+    <div style={{ position: 'relative', height: 60 }}>
       <div
-        onClick={() => { if (state !== 'future') navigate('article', { week: w }); }}
+        onClick={() => { if (state !== 'future') navigate('article', { day: d }); }}
         style={{
           position: 'absolute', left, top: 4,
           width: size, height: size,
@@ -116,34 +119,34 @@ function Node({ w, state, idx }) {
         <div style={{
           width: size, height: size, borderRadius: '50%',
           background: c.bg,
-          boxShadow: `0 5px 0 ${c.sh}`,
+          boxShadow: `0 4px 0 ${c.sh}`,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          border: '4px solid #fff',
+          border: '3px solid #fff',
           boxSizing: 'border-box',
           position: 'relative',
         }}>
           {c.icon === 'check' && (
-            <svg width="28" height="28" viewBox="0 0 28 28"><path d="M6 14 L12 20 L22 8" stroke="#fff" strokeWidth="4" fill="none" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            <svg width="20" height="20" viewBox="0 0 28 28"><path d="M6 14 L12 20 L22 8" stroke="#fff" strokeWidth="4" fill="none" strokeLinecap="round" strokeLinejoin="round"/></svg>
           )}
           {c.icon === 'star' && (
-            <div style={{ fontSize: 12, fontWeight: 900, color: '#fff', textAlign: 'center', lineHeight: 1, fontFamily: DL.fontJp }}>
-              <div style={{ fontSize: 22 }}>W{w}</div>
-              <div style={{ fontSize: 9, marginTop: 2, opacity: 0.95 }}>進行中</div>
+            <div style={{ fontWeight: 900, color: '#fff', textAlign: 'center', lineHeight: 1, fontFamily: DL.fontJp }}>
+              <div style={{ fontSize: 16 }}>D{d}</div>
+              <div style={{ fontSize: 8, marginTop: 2, opacity: 0.95 }}>進行中</div>
             </div>
           )}
           {c.icon === 'lock' && (
-            <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="5" y="10" width="12" height="9" rx="2" fill="#A89F88"/><path d="M7 10 V7 a4 4 0 0 1 8 0 V10" stroke="#A89F88" strokeWidth="2.4" fill="none" strokeLinecap="round"/></svg>
+            <svg width="16" height="16" viewBox="0 0 22 22" fill="none"><rect x="5" y="10" width="12" height="9" rx="2" fill="#A89F88"/><path d="M7 10 V7 a4 4 0 0 1 8 0 V10" stroke="#A89F88" strokeWidth="2.4" fill="none" strokeLinecap="round"/></svg>
           )}
         </div>
-        {state !== 'current' && (
+        {showLabel && (
           <div style={{
-            position: 'absolute', left: '50%', top: size + 4,
+            position: 'absolute', left: '50%', top: size + 2,
             transform: 'translateX(-50%)',
-            fontSize: 10, fontWeight: 800,
+            fontSize: 9, fontWeight: 800,
             color: state === 'future' ? DL.slateLight : DL.mintDark,
             fontFamily: DL.fontJp, whiteSpace: 'nowrap',
           }}>
-            Week {w}
+            Day {d}
           </div>
         )}
       </div>

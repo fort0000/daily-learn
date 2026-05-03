@@ -11,7 +11,7 @@ function RoadmapScreen() {
 
   return (
     <Phone>
-      <StatusBar/>
+      <StatusBar />
       <div style={{ padding: '4px 20px 10px', paddingRight: 76 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
           <div onClick={() => navigate('home')} style={{
@@ -20,10 +20,10 @@ function RoadmapScreen() {
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             cursor: 'pointer', flexShrink: 0,
           }}>
-            <svg width="16" height="16" viewBox="0 0 16 16"><path d="M10 3 L4 8 L10 13" stroke={DL.navy} strokeWidth="2.4" fill="none" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            <svg width="16" height="16" viewBox="0 0 16 16"><path d="M10 3 L4 8 L10 13" stroke={DL.navy} strokeWidth="2.4" fill="none" strokeLinecap="round" strokeLinejoin="round" /></svg>
           </div>
           <div>
-            <div style={{ fontSize: 11, fontWeight: 800, color: DL.slateLight, letterSpacing: 1 }}>90日コース</div>
+            <div style={{ fontSize: 11, fontWeight: 800, color: DL.slateLight, letterSpacing: 1 }}>30日コース</div>
             <div style={{ fontSize: 22, fontWeight: 900, color: DL.navy, fontFamily: DL.fontJp, marginTop: 2 }}>副業を始める</div>
           </div>
         </div>
@@ -33,10 +33,10 @@ function RoadmapScreen() {
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, fontWeight: 800, fontFamily: DL.fontJp, marginBottom: 6 }}>
             <span style={{ color: DL.slate }}>達成度</span>
-            <span style={{ color: DL.primary }}>13% <span style={{ color: DL.slateLight, fontWeight: 700 }}>(12/90日)</span></span>
+            <span style={{ color: DL.primary }}>13% <span style={{ color: DL.slateLight, fontWeight: 700 }}>(12/30日)</span></span>
           </div>
           <div style={{ height: 8, background: '#F5EDDF', borderRadius: 999, overflow: 'hidden' }}>
-            <div style={{ width: '13%', height: '100%', background: `linear-gradient(90deg, ${DL.primary}, ${DL.fire})`, borderRadius: 999 }}/>
+            <div style={{ width: '13%', height: '100%', background: `linear-gradient(90deg, ${DL.primary}, ${DL.fire})`, borderRadius: 999 }} />
           </div>
         </div>
       </div>
@@ -48,37 +48,12 @@ function RoadmapScreen() {
         backgroundSize: '20px 20px',
       }}>
         <div style={{ padding: '18px 0 100px', position: 'relative' }}>
-          <PhaseLabel label="基礎編" sub="Day 1–30" color={DL.mint}/>
-          {days.slice(0, 30).map((d, i) => <Node key={d.d} {...d} idx={i}/>)}
-
-          <PhaseLabel label="実践編" sub="Day 31–60" color={DL.primary} top/>
-          {days.slice(30, 60).map((d, i) => <Node key={d.d} {...d} idx={i + 30}/>)}
-
-          <PhaseLabel label="応用編" sub="Day 61–90" color="#A855F7" top/>
-          {days.slice(60, 90).map((d, i) => <Node key={d.d} {...d} idx={i + 60}/>)}
+          {days.map((d, i) => <Node key={d.d} {...d} idx={i} />)}
         </div>
       </div>
 
-      <TabBar active="home"/>
+      <TabBar active="home" />
     </Phone>
-  );
-}
-
-function PhaseLabel({ label, sub, color, top }) {
-  return (
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: 10,
-      margin: top ? '24px 24px 8px' : '0 24px 8px',
-      padding: '6px 12px',
-      background: '#fff',
-      border: `1.5px solid ${color}`,
-      borderRadius: 12,
-      width: 'fit-content',
-    }}>
-      <div style={{ width: 8, height: 8, borderRadius: 999, background: color }}/>
-      <div style={{ fontSize: 13, fontWeight: 900, color: DL.navy, fontFamily: DL.fontJp }}>{label}</div>
-      <div style={{ fontSize: 11, fontWeight: 700, color: DL.slateLight }}>{sub}</div>
-    </div>
   );
 }
 
@@ -114,7 +89,7 @@ function Node({ d, state, idx }) {
             border: `3px solid ${DL.primary}`,
             opacity: 0.3,
             animation: 'dlpulse 2s infinite ease-out',
-          }}/>
+          }} />
         )}
         <div style={{
           width: size, height: size, borderRadius: '50%',
@@ -126,7 +101,7 @@ function Node({ d, state, idx }) {
           position: 'relative',
         }}>
           {c.icon === 'check' && (
-            <svg width="20" height="20" viewBox="0 0 28 28"><path d="M6 14 L12 20 L22 8" stroke="#fff" strokeWidth="4" fill="none" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            <svg width="20" height="20" viewBox="0 0 28 28"><path d="M6 14 L12 20 L22 8" stroke="#fff" strokeWidth="4" fill="none" strokeLinecap="round" strokeLinejoin="round" /></svg>
           )}
           {c.icon === 'star' && (
             <div style={{ fontWeight: 900, color: '#fff', textAlign: 'center', lineHeight: 1, fontFamily: DL.fontJp }}>
@@ -135,7 +110,7 @@ function Node({ d, state, idx }) {
             </div>
           )}
           {c.icon === 'lock' && (
-            <svg width="16" height="16" viewBox="0 0 22 22" fill="none"><rect x="5" y="10" width="12" height="9" rx="2" fill="#A89F88"/><path d="M7 10 V7 a4 4 0 0 1 8 0 V10" stroke="#A89F88" strokeWidth="2.4" fill="none" strokeLinecap="round"/></svg>
+            <svg width="16" height="16" viewBox="0 0 22 22" fill="none"><rect x="5" y="10" width="12" height="9" rx="2" fill="#A89F88" /><path d="M7 10 V7 a4 4 0 0 1 8 0 V10" stroke="#A89F88" strokeWidth="2.4" fill="none" strokeLinecap="round" /></svg>
           )}
         </div>
         {showLabel && (

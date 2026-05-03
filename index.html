@@ -133,6 +133,7 @@
 <script type="text/babel" data-presets="react" src="screens/article.jsx"></script>
 <script type="text/babel" data-presets="react" src="screens/chat.jsx"></script>
 <script type="text/babel" data-presets="react" src="screens/profile.jsx"></script>
+<script type="text/babel" data-presets="react" src="screens/account.jsx"></script>
 <script type="text/babel" data-presets="react" src="screens/create.jsx"></script>
 
 <script type="text/babel" data-presets="react">
@@ -152,6 +153,7 @@ function App() {
     article: window.ArticleScreen,
     chat: window.ChatScreen,
     profile: window.ProfileScreen,
+    account: window.AccountScreen,
     create: window.CreateScreen,
   }[route.name] || window.HomeScreen;
 
@@ -171,7 +173,7 @@ function App() {
 
 const tryMount = () => {
   if (window.HomeScreen && window.RoadmapScreen && window.ArticleScreen
-    && window.ChatScreen && window.ProfileScreen && window.CreateScreen
+    && window.ChatScreen && window.ProfileScreen && window.AccountScreen && window.CreateScreen
     && window.NavContext && window.Sidebar) {
     ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
   } else {

@@ -1,24 +1,66 @@
 // Screen 5 — Profile / Stats
+function SettingsSection({ title, children }) {
+  const arr = React.Children.toArray(children);
+  return (
+    <div style={{ padding: '20px 20px 0' }}>
+      <div style={{
+        fontSize: 11, fontWeight: 900, color: DL.slateLight, fontFamily: DL.fontJp,
+        letterSpacing: 1, marginBottom: 6, paddingLeft: 4,
+      }}>
+        {title}
+      </div>
+      <div style={{
+        background: '#fff', borderRadius: 16,
+        border: `1.5px solid ${DL.border}`,
+        overflow: 'hidden',
+      }}>
+        {arr.map((child, i) => (
+          <React.Fragment key={i}>
+            {i > 0 && <div style={{ height: 1, background: DL.divider, marginLeft: 14 }} />}
+            {child}
+          </React.Fragment>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SettingsRow({ label, value, onClick }) {
+  return (
+    <div onClick={onClick} style={{
+      padding: '12px 14px',
+      display: 'flex', alignItems: 'center', gap: 10,
+      cursor: 'pointer',
+    }}>
+      <div style={{ fontSize: 12, fontWeight: 800, color: DL.navy, fontFamily: DL.fontJp }}>{label}</div>
+      <div style={{ flex: 1 }} />
+      {value && (
+        <div style={{ fontSize: 12, fontWeight: 700, color: DL.slate, fontFamily: DL.fontJp }}>{value}</div>
+      )}
+      <svg width="8" height="12" viewBox="0 0 8 12" fill="none">
+        <path d="M1.5 1.5 L6 6 L1.5 10.5" stroke={DL.slateLight} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </div>
+  );
+}
+
 function ProfileScreen() {
+  const { navigate } = useNav();
   const stats = [
     { label: '総学習日数', value: '47', unit: '日', color: DL.primary, bg: '#FFEDD5' },
     { label: '完了レッスン', value: '38', unit: '本', color: DL.mintDark, bg: '#DCFCE7' },
-    { label: '学んだトピック', value: '24', unit: '件', color: '#7C3AED', bg: '#EDE9FE' },
-    { label: '解いたクイズ', value: '142', unit: '問', color: '#0EA5E9', bg: '#E0F2FE' },
   ];
   const badges = [
     { icon: '🎯', label: '目標設定', unlocked: true, color: DL.primary },
     { icon: '🔥', label: '7日連続', unlocked: true, color: DL.fire },
     { icon: '📚', label: '初学習', unlocked: true, color: DL.mint },
     { icon: '💎', label: '30日達成', unlocked: false },
-    { icon: '🏆', label: '90日完走', unlocked: false },
+    { icon: '🏆', label: '90日達成', unlocked: false },
   ];
-
-  const heatColors = ['#F5EDDF', '#FED7AA', '#FDBA74', '#FB923C', '#EA580C'];
 
   return (
     <Phone>
-      <StatusBar/>
+      <StatusBar />
       <div style={{
         position: 'absolute', top: 16, bottom: 0, left: 0, right: 0,
         overflowY: 'auto',
@@ -32,20 +74,10 @@ function ProfileScreen() {
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             flexShrink: 0,
           }}>
-            <Mascot size={48}/>
+            <Mascot size={48} />
           </div>
           <div>
             <div style={{ fontSize: 17, fontWeight: 900, color: DL.navy, fontFamily: DL.fontJp }}>たけし</div>
-            <div style={{
-              display: 'inline-flex', alignItems: 'center', gap: 5,
-              marginTop: 4, padding: '3px 9px',
-              background: 'linear-gradient(90deg, #FACC15, #F59E0B)',
-              borderRadius: 999,
-              fontSize: 11, fontWeight: 900, color: '#78350F',
-              fontFamily: DL.fontJp,
-            }}>
-              ⭐ Lv.5 学習者
-            </div>
           </div>
         </div>
 
@@ -59,7 +91,7 @@ function ProfileScreen() {
             position: 'relative', overflow: 'hidden',
             boxShadow: '0 3px 0 #F0E2CD',
           }}>
-            <Flame size={62}/>
+            <Flame size={62} />
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 11, fontWeight: 800, color: DL.fireDark, letterSpacing: 1, fontFamily: DL.fontJp }}>
                 連続記録
@@ -95,7 +127,6 @@ function ProfileScreen() {
         <div style={{ padding: '14px 20px 0' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
             <div style={{ fontSize: 13, fontWeight: 900, color: DL.navy, fontFamily: DL.fontJp }}>バッジ</div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: DL.primary, fontFamily: DL.fontJp }}>3 / 12 →</div>
           </div>
           <div style={{ display: 'flex', gap: 8, justifyContent: 'space-between' }}>
             {badges.map((b, i) => (
@@ -120,32 +151,48 @@ function ProfileScreen() {
           </div>
         </div>
 
-        <div style={{ padding: '14px 20px 0' }}>
+        <SettingsSection title="アカウント">
+          <SettingsRow label="プロフィール" value="名前・メール・パスワード" onClick={() => navigate('account')} />
+        </SettingsSection>
+
+        <SettingsSection title="サブスクリプション">
+          <div style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{
+              padding: '4px 10px', borderRadius: 999,
+              background: 'linear-gradient(90deg, #FACC15, #F59E0B)',
+              fontSize: 11, fontWeight: 900, color: '#78350F', fontFamily: DL.fontJp,
+            }}>
+              無料プラン
+            </div>
+            <div style={{ flex: 1, fontSize: 11, fontWeight: 700, color: DL.slate, fontFamily: DL.fontJp }}>
+              1日1レッスン
+            </div>
+            <div style={{ fontSize: 12, fontWeight: 900, color: DL.primary, fontFamily: DL.fontJp }}>変更 →</div>
+          </div>
+        </SettingsSection>
+
+        <SettingsSection title="その他">
+          <SettingsRow label="利用規約" />
+          <SettingsRow label="プライバシーポリシー" />
+        </SettingsSection>
+
+        <div style={{ padding: '20px 20px 0' }}>
           <div style={{
-            background: '#fff', borderRadius: 18, padding: '12px 14px',
-            border: `1.5px solid ${DL.border}`,
+            padding: '14px',
+            borderRadius: 14,
+            border: `1.5px solid #FECACA`,
+            background: '#fff',
+            textAlign: 'center',
+            fontSize: 13, fontWeight: 900, color: '#DC2626', fontFamily: DL.fontJp,
+            cursor: 'pointer',
           }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
-              <div style={{ fontSize: 12, fontWeight: 900, color: DL.navy, fontFamily: DL.fontJp }}>過去12週間</div>
-              <div style={{ fontSize: 10, fontWeight: 700, color: DL.slateLight, fontFamily: DL.fontJp }}>少 → 多</div>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: 3 }}>
-              {Array.from({ length: 12 * 7 }).map((_, i) => {
-                const lvl = [0,0,1,2,1,3,2,4,3,2,4,3,1,2,3,4,2,3,4,3,2,4,3,4][i % 24];
-                return (
-                  <div key={i} style={{
-                    aspectRatio: '1',
-                    background: heatColors[lvl],
-                    borderRadius: 3,
-                  }}/>
-                );
-              })}
-            </div>
+            ログアウト
           </div>
         </div>
+
       </div>
 
-      <TabBar active="profile"/>
+      <TabBar active="profile" />
     </Phone>
   );
 }

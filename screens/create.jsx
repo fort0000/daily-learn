@@ -6,17 +6,17 @@ function CreateScreen() {
   const [goal, setGoal] = React.useState('');
 
   const levels = [
-    { id: 'novice',       label: '全くの初心者',  sub: 'これから始める',     emoji: '🌱' },
-    { id: 'beginner',     label: '基礎を知っている', sub: '入門書は読んだ',  emoji: '📖' },
-    { id: 'intermediate', label: '実務経験あり',   sub: '何度か手を動かした', emoji: '🛠️' },
-    { id: 'advanced',     label: '上級者',         sub: '人に教えられる',   emoji: '🎓' },
+    { id: 'novice', label: '全くの初心者', sub: 'これから始める', emoji: '🌱' },
+    { id: 'beginner', label: '基礎を知っている', sub: '入門書は読んだ', emoji: '📖' },
+    { id: 'intermediate', label: '実務経験あり', sub: '何度か手を動かした', emoji: '🛠️' },
+    { id: 'advanced', label: '上級者', sub: '人に教えられる', emoji: '🎓' },
   ];
 
   const canSubmit = field.trim().length > 0 && goal.trim().length > 0;
 
   return (
     <Phone>
-      <StatusBar/>
+      <StatusBar />
       <div style={{
         padding: '8px 16px 12px', paddingRight: 76,
         display: 'flex', alignItems: 'center', gap: 10,
@@ -27,7 +27,7 @@ function CreateScreen() {
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           cursor: 'pointer', flexShrink: 0,
         }}>
-          <svg width="16" height="16" viewBox="0 0 16 16"><path d="M10 3 L4 8 L10 13" stroke={DL.navy} strokeWidth="2.4" fill="none" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          <svg width="16" height="16" viewBox="0 0 16 16"><path d="M10 3 L4 8 L10 13" stroke={DL.navy} strokeWidth="2.4" fill="none" strokeLinecap="round" strokeLinejoin="round" /></svg>
         </div>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 10, fontWeight: 800, color: DL.slateLight, letterSpacing: 1 }}>NEW COURSE</div>
@@ -49,7 +49,7 @@ function CreateScreen() {
             何を学びたい？
           </h1>
           <div style={{ fontSize: 12, color: DL.slate, fontFamily: DL.fontJp, lineHeight: 1.5 }}>
-            3つ答えるだけで、AIが90日のプランを設計します。
+            3つ答えるだけで、AIが30日のプランを設計します。
           </div>
         </div>
 
@@ -105,7 +105,7 @@ function CreateScreen() {
                     flexShrink: 0,
                   }}>
                     {active && (
-                      <svg width="12" height="12" viewBox="0 0 12 12"><path d="M2 6 L5 9 L10 3" stroke="#fff" strokeWidth="2.4" fill="none" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                      <svg width="12" height="12" viewBox="0 0 12 12"><path d="M2 6 L5 9 L10 3" stroke="#fff" strokeWidth="2.4" fill="none" strokeLinecap="round" strokeLinejoin="round" /></svg>
                     )}
                   </div>
                 </button>
@@ -114,7 +114,7 @@ function CreateScreen() {
           </div>
         </Field>
 
-        <Field label="🏁 ゴール" hint="90日後にどうなっていたい？具体的なほどプランの精度が上がります">
+        <Field label="🏁 ゴール" hint="30日後にどうなっていたい？具体的なほどプランの精度が上がります">
           <textarea
             value={goal}
             onChange={(e) => setGoal(e.target.value)}
@@ -140,7 +140,7 @@ function CreateScreen() {
         </div>
       </div>
 
-      <TabBar active="home"/>
+      <TabBar active="home" />
     </Phone>
   );
 }

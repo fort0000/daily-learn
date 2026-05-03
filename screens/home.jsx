@@ -65,7 +65,7 @@ function HomeScreen() {
 
       <div style={{ padding: '14px 20px 0' }}>
         <button
-          onClick={() => navigate('article', { mode: 'create' })}
+          onClick={() => navigate('create')}
           style={{
             width: '100%',
             background: '#fff',

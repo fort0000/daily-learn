@@ -105,18 +105,13 @@ function Node({ w, state, idx }) {
           cursor: state === 'future' ? 'not-allowed' : 'pointer',
         }}>
         {state === 'current' && (
-          <>
-            <div style={{
-              position: 'absolute', inset: -8,
-              borderRadius: '50%',
-              border: `3px solid ${DL.primary}`,
-              opacity: 0.3,
-              animation: 'dlpulse 2s infinite ease-out',
-            }}/>
-            <div style={{ position: 'absolute', left: '50%', top: -52, transform: 'translateX(-50%)' }}>
-              <Mascot size={56}/>
-            </div>
-          </>
+          <div style={{
+            position: 'absolute', inset: -8,
+            borderRadius: '50%',
+            border: `3px solid ${DL.primary}`,
+            opacity: 0.3,
+            animation: 'dlpulse 2s infinite ease-out',
+          }}/>
         )}
         <div style={{
           width: size, height: size, borderRadius: '50%',

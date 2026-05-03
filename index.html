@@ -133,6 +133,7 @@
 <script type="text/babel" data-presets="react" src="screens/article.jsx"></script>
 <script type="text/babel" data-presets="react" src="screens/chat.jsx"></script>
 <script type="text/babel" data-presets="react" src="screens/profile.jsx"></script>
+<script type="text/babel" data-presets="react" src="screens/create.jsx"></script>
 
 <script type="text/babel" data-presets="react">
 function App() {
@@ -151,6 +152,7 @@ function App() {
     article: window.ArticleScreen,
     chat: window.ChatScreen,
     profile: window.ProfileScreen,
+    create: window.CreateScreen,
   }[route.name] || window.HomeScreen;
 
   return (
@@ -169,7 +171,8 @@ function App() {
 
 const tryMount = () => {
   if (window.HomeScreen && window.RoadmapScreen && window.ArticleScreen
-    && window.ChatScreen && window.ProfileScreen && window.NavContext && window.Sidebar) {
+    && window.ChatScreen && window.ProfileScreen && window.CreateScreen
+    && window.NavContext && window.Sidebar) {
     ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
   } else {
     setTimeout(tryMount, 50);

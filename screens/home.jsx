@@ -195,7 +195,7 @@ function LessonCarousel() {
         }}>
           {lessons.map((l, i) => (
             <div key={i} style={{
-              flex: '0 0 calc(100% - 72px)', boxSizing: 'border-box',
+              flex: '0 0 calc(100% - 48px)', boxSizing: 'border-box',
               transition: 'opacity 220ms, transform 220ms',
               opacity: i === idx ? 1 : 0.55,
               transform: i === idx ? 'scale(1)' : 'scale(0.96)',

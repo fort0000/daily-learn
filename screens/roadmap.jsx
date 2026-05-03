@@ -1,7 +1,7 @@
-// Screen 2 — Roadmap (90-day winding path, one node per day)
+// Screen 2 — Roadmap (30-day winding path, one node per day)
 function RoadmapScreen() {
   const { navigate } = useNav();
-  const days = Array.from({ length: 90 }, (_, i) => {
+  const days = Array.from({ length: 30 }, (_, i) => {
     const d = i + 1;
     let state = 'future';
     if (d <= 11) state = 'done';
@@ -69,7 +69,7 @@ function Node({ d, state, idx }) {
   };
   const c = colors[state];
   const size = state === 'current' ? 56 : 44;
-  // Reduce label clutter on a 90-node path: show the Day label only on
+  // Reduce label clutter on a 30-node path: show the Day label only on
   // milestone days (every 10) and on the last completed day.
   const showLabel = state !== 'current' && (d % 10 === 0 || d === 11 || d === 1);
 

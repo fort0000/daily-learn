@@ -13,7 +13,7 @@ function HomeScreen() {
 
   return (
     <Phone>
-      <StatusBar/>
+      <StatusBar />
       <div style={{ padding: '4px 20px 0', paddingRight: 76 }}>
         <div style={{ fontSize: 13, color: DL.slate, fontWeight: 700, letterSpacing: 0.5 }}>5月3日(金)</div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 10, flexWrap: 'wrap' }}>
@@ -24,14 +24,14 @@ function HomeScreen() {
             display: 'flex', alignItems: 'center', gap: 4,
             boxShadow: `0 0 0 2px ${DL.fire}`,
           }}>
-            <Flame size={22}/>
+            <Flame size={22} />
             <div style={{ fontSize: 13, fontWeight: 900, color: DL.fire, fontVariantNumeric: 'tabular-nums' }}>12</div>
             <div style={{ fontSize: 10, fontWeight: 800, color: DL.slate, fontFamily: DL.fontJp }}>日連続</div>
           </div>
         </div>
       </div>
 
-      <LessonCarousel/>
+      <LessonCarousel />
 
       <div style={{ padding: '18px 20px 0' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10 }}>
@@ -51,7 +51,7 @@ function HomeScreen() {
                 boxShadow: d.done ? '0 2px 0 #0F7A38' : 'none',
               }}>
                 {d.done ? (
-                  <svg width="16" height="16" viewBox="0 0 16 16"><path d="M3 8 L7 12 L13 4" stroke="#fff" strokeWidth="2.6" fill="none" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                  <svg width="16" height="16" viewBox="0 0 16 16"><path d="M3 8 L7 12 L13 4" stroke="#fff" strokeWidth="2.6" fill="none" strokeLinecap="round" strokeLinejoin="round" /></svg>
                 ) : d.today ? '今' : ''}
               </div>
               <div style={{ fontSize: 10, fontWeight: 700, color: d.today ? DL.primary : DL.slateLight, fontFamily: DL.fontJp }}>{d.d}</div>
@@ -82,17 +82,17 @@ function HomeScreen() {
             flexShrink: 0,
           }}>
             <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-              <path d="M11 4 V18 M4 11 H18" stroke="#fff" strokeWidth="3" strokeLinecap="round"/>
+              <path d="M11 4 V18 M4 11 H18" stroke="#fff" strokeWidth="3" strokeLinecap="round" />
             </svg>
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 14, fontWeight: 900, color: DL.navy }}>新しい学習コースを作る</div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: DL.slate, marginTop: 2 }}>目標を入力 → AIがプランを設計</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: DL.slate, marginTop: 2 }}>目標を入力 → AIがコースを設計</div>
           </div>
         </button>
       </div>
 
-      <TabBar active="home"/>
+      <TabBar active="home" />
     </Phone>
   );
 }
@@ -107,27 +107,27 @@ function LessonCarousel() {
       summary: '3C・4P・SWOTを使い分けて、市場のスキマを見つける方法。今日は3Cから始めよう。',
       cta: '今日の学びを始める →',
       color: DL.primary, shadow: DL.primaryShadow,
-      chip: { bg: '#FFEDD5', dot: DL.fire, fg: DL.fireDark, label: 'DAY 12 / 90' },
+      chip: { bg: '#FFEDD5', dot: DL.fire, fg: DL.fireDark, label: 'DAY 12 / 30' },
       blob: '#FFE4D1',
       planId: 'side-business',
     },
     {
-      day: 13, status: 'tomorrow', eyebrow: '明日 (5/4)',
+      day: 13, status: 'tomorrow', eyebrow: '今日のレッスン',
       title: ['顧客インタビュー', 'の作り方'],
       summary: '5人に聞くだけで仮説の8割は検証できる。質問リストを準備しよう。',
       cta: '今日の学びを始める →',
       color: DL.mint, shadow: DL.mintShadow,
-      chip: { bg: '#DCFCE7', dot: DL.mint, fg: DL.mintDark, label: 'DAY 13 / 90' },
+      chip: { bg: '#DCFCE7', dot: DL.mint, fg: DL.mintDark, label: 'DAY 13 / 30' },
       blob: '#D1FAE5',
       planId: 'interview',
     },
     {
-      day: 14, status: 'soon', eyebrow: '5月5日(日)',
+      day: 14, status: 'soon', eyebrow: '今日のレッスン',
       title: ['価格設定の', 'やさしい考え方'],
       summary: 'コスト基準・市場基準・価値基準。3つの軸でブレずに値段を決める。',
       cta: '今日の学びを始める →',
       color: '#A855F7', shadow: '#7E22CE',
-      chip: { bg: '#EDE9FE', dot: '#A855F7', fg: '#6D28D9', label: 'DAY 14 / 90' },
+      chip: { bg: '#EDE9FE', dot: '#A855F7', fg: '#6D28D9', label: 'DAY 14 / 30' },
       blob: '#EDE9FE',
       planId: 'pricing',
     },
@@ -212,7 +212,7 @@ function LessonCarousel() {
                   width: 120, height: 120, borderRadius: '50%',
                   background: `radial-gradient(circle, ${l.blob} 0%, ${l.blob} 60%, transparent 70%)`,
                   opacity: 0.7,
-                }}/>
+                }} />
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'relative' }}>
                   <div style={{
                     display: 'inline-flex', alignItems: 'center', gap: 6,
@@ -221,7 +221,7 @@ function LessonCarousel() {
                     fontSize: 11, fontWeight: 900, color: l.chip.fg,
                     letterSpacing: 0.5,
                   }}>
-                    <span style={{ width: 6, height: 6, borderRadius: 999, background: l.chip.dot }}/>
+                    <span style={{ width: 6, height: 6, borderRadius: 999, background: l.chip.dot }} />
                     {l.chip.label}
                   </div>
                   <div style={{ fontSize: 11, fontWeight: 800, color: DL.slate, fontFamily: DL.fontJp }}>
@@ -235,7 +235,7 @@ function LessonCarousel() {
                   marginTop: 4, fontSize: 23, fontWeight: 900, color: DL.navy,
                   fontFamily: DL.fontJp, lineHeight: 1.25, letterSpacing: -0.3,
                 }}>
-                  {l.title[0]}<br/>{l.title[1]}
+                  {l.title[0]}<br />{l.title[1]}
                 </div>
                 <div style={{ marginTop: 8, fontSize: 13, color: DL.slate, lineHeight: 1.6, fontFamily: DL.fontJp }}>
                   {l.summary}
@@ -262,16 +262,16 @@ function LessonCarousel() {
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                     }}>
                       <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                        <path d="M3 4 Q8 4 8 8 Q8 12 13 12" stroke={l.chip.fg} strokeWidth="2" strokeLinecap="round" fill="none"/>
-                        <circle cx="3" cy="4" r="1.6" fill={l.chip.fg}/>
-                        <circle cx="13" cy="12" r="1.6" fill={l.chip.fg}/>
+                        <path d="M3 4 Q8 4 8 8 Q8 12 13 12" stroke={l.chip.fg} strokeWidth="2" strokeLinecap="round" fill="none" />
+                        <circle cx="3" cy="4" r="1.6" fill={l.chip.fg} />
+                        <circle cx="13" cy="12" r="1.6" fill={l.chip.fg} />
                       </svg>
                     </div>
                     <div style={{ fontSize: 12, fontWeight: 800, color: DL.navy, fontFamily: DL.fontJp }}>
-                      このプランのロードマップ
+                      このコースのロードマップ
                     </div>
                   </div>
-                  <svg width="16" height="16" viewBox="0 0 20 20" fill="none"><path d="M7 4 L13 10 L7 16" stroke={l.chip.fg} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                  <svg width="16" height="16" viewBox="0 0 20 20" fill="none"><path d="M7 4 L13 10 L7 16" stroke={l.chip.fg} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
                 </div>
               </div>
             </div>
@@ -284,7 +284,7 @@ function LessonCarousel() {
             width: i === idx ? 22 : 7, height: 7, borderRadius: 999,
             background: i === idx ? DL.primary : '#E5DCC8',
             transition: 'all 200ms', cursor: 'pointer',
-          }}/>
+          }} />
         ))}
       </div>
     </div>

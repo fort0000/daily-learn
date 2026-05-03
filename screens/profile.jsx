@@ -55,7 +55,7 @@ function ProfileScreen() {
     { icon: '🔥', label: '7日連続', unlocked: true, color: DL.fire },
     { icon: '📚', label: '初学習', unlocked: true, color: DL.mint },
     { icon: '💎', label: '30日達成', unlocked: false },
-    { icon: '🏆', label: '90日達成', unlocked: false },
+    { icon: '🏆', label: '100日連続', unlocked: false },
   ];
 
   return (

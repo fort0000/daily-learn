@@ -49,7 +49,7 @@ function CreateScreen() {
             何を学びたい？
           </h1>
           <div style={{ fontSize: 12, color: DL.slate, fontFamily: DL.fontJp, lineHeight: 1.5 }}>
-            3つ答えるだけで、AIが30日のプランを設計します。
+            3つ答えるだけで、AIが30日のコースを設計します。
           </div>
         </div>
 
@@ -114,7 +114,7 @@ function CreateScreen() {
           </div>
         </Field>
 
-        <Field label="🏁 ゴール" hint="30日後にどうなっていたい？具体的なほどプランの精度が上がります">
+        <Field label="🏁 ゴール" hint="30日後にどうなっていたい？具体的なほどコースの精度が上がります">
           <textarea
             value={goal}
             onChange={(e) => setGoal(e.target.value)}

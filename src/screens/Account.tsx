@@ -42,8 +42,8 @@ export function AccountScreen() {
           </svg>
         </div>
         <div className="flex-1">
-          <div className="text-[10px] font-extrabold text-dl-slate-light tracking-wider">ACCOUNT</div>
-          <div className="text-[13px] font-black text-dl-navy font-jp mt-px">アカウント情報</div>
+          <div className="text-[10px] font-extrabold text-dl-slate-light tracking-wider">PROFILE</div>
+          <div className="text-[13px] font-black text-dl-navy font-jp mt-px">プロフィール</div>
         </div>
       </div>
 
@@ -97,9 +97,8 @@ export function AccountScreen() {
             value={confirmPw}
             onChange={(e) => setConfirmPw(e.target.value)}
             placeholder="••••••••"
-            className={`w-full box-border bg-white rounded-2xl px-3.5 py-3 text-sm font-bold text-dl-navy font-jp outline-none border-[1.5px] ${
-              confirmMismatch ? 'border-[#FCA5A5]' : 'border-dl-border'
-            }`}
+            className={`w-full box-border bg-white rounded-2xl px-3.5 py-3 text-sm font-bold text-dl-navy font-jp outline-none border-[1.5px] ${confirmMismatch ? 'border-[#FCA5A5]' : 'border-dl-border'
+              }`}
           />
           {confirmMismatch && (
             <div className="text-[11px] font-bold text-[#DC2626] font-jp mt-1.5">

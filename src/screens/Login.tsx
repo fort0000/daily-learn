@@ -125,7 +125,7 @@ export function LoginScreen() {
               <input
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
-                placeholder="たけし"
+                placeholder=""
                 className={inputClass}
               />
             </Field>

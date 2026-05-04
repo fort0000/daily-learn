@@ -279,10 +279,12 @@ FOR SELECT USING (
 
 | Phase | マイグレーション | テーブル |
 |---|---|---|
-| 2 | `0001_profiles.sql` | `profiles` + `handle_new_user` トリガ + RLS |
-| 3 | `0002_courses_lessons.sql` | `courses`, `lessons`(`body jsonb` / `completed_at` 含む)+ `get_streak` 関数 + RLS |
-| 5 | `0003_chat.sql` | `chat_messages` + RLS(EXISTS ポリシー) |
-| - | `0004_badges.sql` | `badges`, `user_badges` + 初期バッジ seed |
+| 2 | `<ts>_profiles.sql` | `profiles` + `handle_new_user` トリガ + RLS |
+| 3 | `<ts>_courses_lessons.sql` | `courses`, `lessons`(`body jsonb` / `completed_at` 含む)+ `get_streak` 関数 + RLS |
+| 5 | `<ts>_chat.sql` | `chat_messages` + RLS(EXISTS ポリシー) |
+| - | `<ts>_badges.sql` | `badges`, `user_badges` + 初期バッジ seed |
+
+`<ts>` は `YYYYMMDDHHMMSS` 形式の UTC タイムスタンプ。`supabase migration new <name>` で生成すると自動で付く。
 
 `badges` は機能優先度が低いので Phase 番号は割り当てず、適時投入。
 

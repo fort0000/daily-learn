@@ -1,6 +1,6 @@
 import { DL } from '../lib/dl';
 import { useNav, type RouteName } from '../lib/nav';
-import { Mascot } from './Mascot';
+import { AppIcon } from './AppIcon';
 import { Flame } from './Flame';
 
 type Item = {
@@ -57,9 +57,7 @@ export function Sidebar() {
   return (
     <aside className="hidden md:flex md:flex-col md:gap-2 md:w-[248px] md:shrink-0 md:pt-6 md:px-4 md:pb-5 md:bg-dl-bg md:border-r md:border-dl-border md:box-border">
       <div className="flex items-center gap-2.5 pt-1 px-2 pb-3.5 border-b border-dl-border mb-1.5">
-        <div className="w-11 h-11 rounded-[14px] bg-[#FEF3C7] border-2 border-dl-yellow flex items-center justify-center">
-          <Mascot size={32} />
-        </div>
+        <AppIcon size={44} rounded="rounded-[14px]" />
         <div>
           <div className="text-[17px] font-black text-dl-navy font-jp leading-[1.1]">DailyLearn</div>
           <div className="text-[10px] font-bold text-dl-slate-light font-jp mt-[3px]">

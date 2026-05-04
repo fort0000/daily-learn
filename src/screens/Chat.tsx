@@ -3,7 +3,7 @@ import { useNav } from '../lib/nav';
 import { Phone } from '../components/Phone';
 import { StatusBar } from '../components/StatusBar';
 import { TabBar } from '../components/TabBar';
-import { Mascot } from '../components/Mascot';
+import { AppIcon } from '../components/AppIcon';
 
 type Message = { from: 'bot' | 'user'; text: string };
 
@@ -39,9 +39,7 @@ export function ChatScreen() {
             />
           </svg>
         </div>
-        <div className="w-11 h-11 rounded-full bg-[#FEF3C7] flex items-center justify-center border-2 border-dl-yellow shrink-0">
-          <Mascot size={36} />
-        </div>
+        <AppIcon size={44} rounded="rounded-2xl" />
         <div className="flex-1 min-w-0">
           <div className="text-sm font-black text-dl-navy font-jp">コーチに聞いてみよう</div>
           <div className="text-[11px] font-bold text-dl-mint-dark font-jp flex items-center gap-1 mt-px">
@@ -66,9 +64,7 @@ export function ChatScreen() {
             <Bubble2 key={i} m={m} />
           ))}
           <div className="flex gap-2 items-end">
-            <div className="w-8 h-8 rounded-full bg-[#FEF3C7] flex items-center justify-center shrink-0">
-              <Mascot size={28} />
-            </div>
+            <AppIcon size={32} rounded="rounded-xl" />
             <div className="bg-white rounded-[18px_18px_18px_4px] px-3.5 py-3 flex gap-1 border border-dl-border">
               <Dot />
               <Dot d={0.2} />
@@ -116,9 +112,7 @@ function Bubble2({ m }: { m: Message }) {
   }
   return (
     <div className="flex gap-2 items-end">
-      <div className="w-8 h-8 rounded-full bg-[#FEF3C7] flex items-center justify-center shrink-0">
-        <Mascot size={28} />
-      </div>
+      <AppIcon size={32} rounded="rounded-xl" />
       <div className="bg-white text-dl-navy rounded-[18px_18px_18px_4px] px-3.5 py-2.5 max-w-[78%] text-[13px] leading-[1.6] font-jp font-semibold whitespace-pre-wrap border border-dl-border">
         {m.text}
       </div>

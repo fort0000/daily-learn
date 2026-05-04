@@ -1,6 +1,11 @@
 .playwright-mcp/
 .DS_Store
 
+# Build output
+node_modules/
+dist/
+*.tsbuildinfo
+
 # wrangler files
 .wrangler
 .dev.vars*

@@ -37,7 +37,7 @@ erDiagram
         uuid id PK
         uuid user_id FK
         text field
-        text level
+        text prerequisite
         text goal
         text title
         text status
@@ -99,7 +99,7 @@ erDiagram
 | `id` | `uuid` | PK DEFAULT `gen_random_uuid()` | |
 | `user_id` | `uuid` | NOT NULL, FK → `auth.users(id)` ON DELETE CASCADE | |
 | `field` | `text` | NOT NULL | 例: "投資", "起業" |
-| `level` | `text` | NOT NULL, CHECK in (`'beginner'`,`'intermediate'`,`'advanced'`) | |
+| `prerequisite` | `text` | NULL | ユーザーが申告した前提知識の自由記述。未入力 = 基礎から組み立てる |
 | `goal` | `text` | NOT NULL | ユーザー入力の目標 |
 | `title` | `text` | NOT NULL | AI 生成のコース名 |
 | `status` | `text` | NOT NULL DEFAULT `'generating'`, CHECK in (`'generating'`,`'active'`,`'completed'`,`'archived'`) | |

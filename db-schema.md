@@ -41,6 +41,7 @@ erDiagram
         text goal
         text title
         text status
+        text generation_error
         timestamptz started_at
         timestamptz created_at
     }
@@ -101,12 +102,15 @@ erDiagram
 | `field` | `text` | NOT NULL | 例: "投資", "起業" |
 | `prerequisite` | `text` | NULL | ユーザーが申告した前提知識の自由記述。未入力 = 基礎から組み立てる |
 | `goal` | `text` | NOT NULL | ユーザー入力の目標 |
-| `title` | `text` | NOT NULL | AI 生成のコース名 |
-| `status` | `text` | NOT NULL DEFAULT `'generating'`, CHECK in (`'generating'`,`'active'`,`'completed'`,`'archived'`) | |
-| `started_at` | `timestamptz` | NULL | 初回レッスン完了時にセット |
+| `title` | `text` | NOT NULL | AI 生成のコース名。`status='generating'` 中は `field` を流用した仮値が入り、骨格生成完了時に確定値へ UPDATE される |
+| `status` | `text` | NOT NULL DEFAULT `'generating'`, CHECK in (`'generating'`,`'active'`,`'completed'`,`'failed'`,`'archived'`) | ライフサイクル: `generating`(Edge Function が背景生成中)→ `active`(骨格生成成功・通常表示)→ `completed`(全30日完了、将来機能)。失敗パスは `generating → failed`。ユーザーが消したら `archived` |
+| `generation_error` | `text` | NULL | `status='failed'` のときに UI で出すエラー要約。Phase 4 で追加 |
+| `started_at` | `timestamptz` | NULL | 初回レッスン完了時にセット(コース INSERT 時点では NULL) |
 | `created_at` | `timestamptz` | NOT NULL DEFAULT `now()` | |
 
 **index**: `(user_id, status)` — ユーザー画面の「アクティブなコース一覧」用。
+
+**Realtime**: `courses` を `supabase_realtime` publication に追加する(Phase 4)。Edge Function の背景タスクが `status` を `'generating' → 'active' / 'failed'` に更新した瞬間にホーム画面のカードが切り替わるよう、フロントは `postgres_changes` で購読する。
 
 ### `lessons` — 1日分の学習コンテンツ(個人専用)
 
@@ -120,6 +124,8 @@ erDiagram
 | `body` | `jsonb` | NULL | 本文の構造化データ。スキーマは下記 `LessonBody` を参照。On-demand 生成までは NULL(=未生成と等価、別途 status 列は持たない) |
 | `generated_at` | `timestamptz` | NULL | 本文生成時にセット。「いつ生成したか」は `body` の NULL 判定から導出できないため独立カラムで保持 |
 | `completed_at` | `timestamptz` | NULL | NULL = 未完了。値あり = 完了日時 |
+| `prefetch_batch_id` | `text` | NULL | Anthropic Batch API 投入中の batch ID。未投入 / 結果取り込み済み = NULL(Phase 5 で追加) |
+| `prefetch_submitted_at` | `timestamptz` | NULL | Batch 投入時刻。24h 超過時は諦めて NULL に戻す(Phase 5 で追加) |
 | `created_at` | `timestamptz` | NOT NULL DEFAULT `now()` | |
 
 **制約**: `UNIQUE (course_id, day)`
@@ -169,14 +175,60 @@ type LessonBody = {
 }
 ```
 
-#### 生成フロー(Phase 5: `/api/lessons/:id/generate`)
+#### 本文生成フロー
 
-品質劣化を避けるため **2段階生成 + Tool Use** を採用:
+呼び出し経路は 2 つ。プロンプト・retry 仕様は両方で同一(実装も同一の生成関数を共有):
 
-1. **Step 1 (ドラフト)**: Claude Opus 4.7 + extended thinking で「Markdown でレッスン本文を書け」と自由に書かせる(構造化負荷ゼロ)
-2. **Step 2 (整形)**: Claude Sonnet 4.6 に `save_lesson` ツール(input_schema は Zod から自動生成)で `LessonBody` JSON に整形させる。`tool_choice` で強制
-3. **Zod 検証**: NG なら失敗内容をフィードバックして Claude に1回だけ再生成させる
-4. **保存**: 検証通過したら `lessons.body` に JSON を入れ、`generated_at = now()`(`body IS NOT NULL` で「生成済み」を判定)
+- **Realtime 生成**: Edge Function `lessons-generate` が呼ばれた時に Opus を 1 回呼んで生成
+  - 新規コース作成直後の Day 1 生成(`courses-generate` の background task 内で共有モジュールとして呼ばれる)
+  - Batch 失敗 / 深夜完了 → 翌朝 6 時前にオープンしたケース
+  - その他、`body IS NULL` のレッスンを開いた時の汎用フォールバック
+- **Batch 投入**: Edge Function `lessons-prefetch-next` がレッスン完了時に Anthropic Batch API へ投入
+  - 投入のみで結果取り込みはしない。結果は下記の Supabase pg_cron(毎朝 6 時)が一括 pull
+
+**Claude Opus 4.7 を 1 回呼ぶだけで完結する単段構成**(`save_lesson` Tool Use で `LessonBody` JSON を直接得る)。
+
+当初は Opus でドラフト → Sonnet で整形 という 2 段階構成を検討したが、第三者レビューで以下が指摘されたため棄却:
+
+- 「構造化を課すと文章品質が落ちる」は Claude 3 世代の経験則で、4.x の Tool Use は schema 追従精度が高く実務上の劣化はほぼ無視できる
+- 整形ステップが「`==highlight==` の喪失 / `tip` と `paragraph` の誤分類 / カウント制約違反のごまかし」という別の品質劣化を生む(本末転倒)
+- 2 段階分離は API コール数 / Batch 待機 / 障害系統 / 運用監視対象を全て倍にする(Batch API は最悪 24h × 2 = 48h 待ちになる)
+- 単段で実装して 50 件単位で品質を実測し、本当に劣化が出たら 2 段階に戻すのが正しい順序
+
+1. **生成**: Claude Opus 4.7 + extended thinking + `save_lesson` Tool Use(input_schema は Zod から自動生成、`tool_choice` で強制)で `LessonBody` JSON を直接出力。プロンプトには以下を必ず同梱:
+   - 当該コースの `(field, goal, prerequisite)` … トーン・深さの校正
+   - コース全30件の `(day, title, summary)` … 学習アーク全体を見せる(Day 間の重複・矛盾防止)
+   - 当該レッスン自身の `(day, title, summary)` を「これから書く対象」として強調
+   - **few-shot 例 2〜3 件**(良質な `LessonBody` JSON)… `==highlight==` 記法の維持・block 構成・トーン統一に最も効く
+2. **Zod 検証**: NG なら **具体的なエラー内容**(例: `points must have exactly 3 items, got 4` / `blocks: action must appear exactly once`)を文字列化してフィードバックし、Claude に 1 回だけ再生成させる。汎用メッセージだと retry 成功率が大きく落ちるため、Zod の `error.issues` を必ずそのまま渡す
+3. **保存**: 検証通過したら `lessons.body` に JSON を入れ、`generated_at = now()`(`body IS NOT NULL` で「生成済み」を判定)。`UPDATE` は **`WHERE body IS NULL`** で守る(Batch 経路と Realtime 経路のレース対策)
+
+**Prompt caching**: システムプロンプト + `LessonBody` スキーマ説明 + few-shot 例 + コース全30件リストは全レッスンで再利用されるので `cache_control` を付ける。retry / 連続生成でキャッシュヒットすれば input コストが約 1/10。
+
+**過去 body は渡さない**: コストが約 10 倍になり、title + summary だけで十分なアーク把握が見込めるため。アーク逸脱が問題化したら再検討。
+
+#### 翌日レッスンの事前生成(Batch API)
+
+毎レッスン完了時に翌日レッスンの本文生成を Anthropic Batch API へ投入し、ユーザーが翌日開いた瞬間にローディングなしで読める状態を作る。Batch API は通常価格の **50%** のため、ユーザーが継続するほど Phase 5 全体の生成コストが下がる。
+
+**発火**(クライアントが `markLessonComplete` 成功後に `supabase.functions.invoke('lessons-prefetch-next', { body: { lesson_id } })` を叩く):
+
+- 完了したレッスンの `day` が、そのコース内の **完了済みレッスンの最大 `day`** と一致(=「最新を進めた完了」のときだけ発火。過去日を埋めた完了では何もしない)
+- `day + 1 ≤ 30`(コース未完)
+- 翌日レッスンの `body IS NULL` かつ `prefetch_batch_id IS NULL`(二重投入防止)
+
+条件成立時、Batch に 1 件投入し `prefetch_batch_id` / `prefetch_submitted_at` をセット。プロンプト(コースメタ + 全30件 title/summary)は通常生成と同一。
+
+**結果取り込み**(Supabase pg_cron が毎朝 06:00 JST = `0 21 * * *` UTC に Edge Function `prefetch-pull` を起動して一括処理):
+
+`lessons WHERE prefetch_batch_id IS NOT NULL AND body IS NULL` を全件取り出し、Anthropic Batch API で各 `prefetch_batch_id` の状態を確認:
+
+- 完了済み + Zod 検証通過 → `body` を保存(`WHERE body IS NULL`)、`generated_at = now()`、`prefetch_batch_id = NULL`
+- 未完了 / 失敗 / Zod NG → `prefetch_batch_id = NULL` に戻して諦める(以降の開封で Realtime が走る)
+
+**開封時の動作**: Edge Function `lessons-generate` は `body IS NULL` なら Realtime のみ。Batch のことは知らない(分岐は pg_cron に集約)。深夜完了 → 翌朝 6 時時点で Batch 未完了の場合は Realtime にフォールバックし、その日のバッチは破棄される(取りこぼしを許容するシンプル運用)。
+
+**Race protection**: `body` の UPDATE は常に **`WHERE body IS NULL`**。これにより「6 時 cron が body 保存 → 直後にユーザーが開いて Realtime」がぶつかっても二重生成にならない。
 
 #### Renderer
 
@@ -202,7 +254,7 @@ type LessonBody = {
 
 **所有権**: `lesson → course → user_id` で辿る。
 
-**API パス**: `/api/chat/lessons/:lessonId/send`(`thread_id` ベースではなく `lesson_id` ベース)。
+**API**: Edge Function `chat-send`(入力 `{ lesson_id, content }`、`thread_id` ベースではなく `lesson_id` ベース)。
 
 ### `badges` — バッジマスタ(管理者のみ INSERT)
 
@@ -281,7 +333,9 @@ FOR SELECT USING (
 |---|---|---|
 | 2 | `<ts>_profiles.sql` | `profiles` + `handle_new_user` トリガ + RLS |
 | 3 | `<ts>_courses_lessons.sql` | `courses`, `lessons`(`body jsonb` / `completed_at` 含む)+ `get_streak` 関数 + RLS |
+| 4 | `<ts>_courses_async_generation.sql` | `courses.status` CHECK に `'failed'` 追加 + `generation_error` 列追加 + `courses` を `supabase_realtime` publication に登録 |
 | 5 | `<ts>_chat.sql` | `chat_messages` + RLS(EXISTS ポリシー) |
+| 5 | `<ts>_lessons_prefetch.sql` | `lessons` に `prefetch_batch_id` / `prefetch_submitted_at` 列追加 + pg_cron 設定 |
 | - | `<ts>_badges.sql` | `badges`, `user_badges` + 初期バッジ seed |
 
 `<ts>` は `YYYYMMDDHHMMSS` 形式の UTC タイムスタンプ。`supabase migration new <name>` で生成すると自動で付く。

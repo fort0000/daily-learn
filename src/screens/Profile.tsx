@@ -1,4 +1,4 @@
-import { Children, Fragment, useState, type ReactNode } from 'react';
+import { Children, Fragment, useEffect, useState, type ReactNode } from 'react';
 import { DL } from '../lib/dl';
 import { useNav } from '../lib/nav';
 import { Phone } from '../components/Phone';
@@ -7,6 +7,7 @@ import { TabBar } from '../components/TabBar';
 import { AppIcon } from '../components/AppIcon';
 import { Flame } from '../components/Flame';
 import { resolveDisplayName, signOut, useProfile, useSession } from '../lib/auth';
+import { fetchTotalCompleted, getStreak } from '../lib/db';
 
 function SettingsSection({ title, children }: { title: string; children: ReactNode }) {
   const arr = Children.toArray(children);
@@ -67,14 +68,31 @@ export function ProfileScreen() {
   const { profile, error: profileError } = useProfile(userId);
   const [signingOut, setSigningOut] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [streak, setStreak] = useState({ current: 0, longest: 0 });
+  const [totalCompleted, setTotalCompleted] = useState(0);
+
+  useEffect(() => {
+    if (!userId) return;
+    let active = true;
+    Promise.all([getStreak(), fetchTotalCompleted()])
+      .then(([s, count]) => {
+        if (!active) return;
+        setStreak(s);
+        setTotalCompleted(count);
+      })
+      .catch((e) => console.error('[Profile] stats load failed:', e));
+    return () => {
+      active = false;
+    };
+  }, [userId]);
 
   const displayName = resolveDisplayName(profile, session.session) ?? '...';
   const planLabel = profile?.plan === 'paid' ? '有料プラン' : '無料プラン';
   const planHint = profile?.plan === 'paid' ? 'すべての機能を利用可能' : '1日1レッスン';
 
   const stats: Stat[] = [
-    { label: '総学習日数', value: '0', unit: '日', color: DL.primary, bg: '#FFEDD5' },
-    { label: '完了レッスン', value: '0', unit: '本', color: DL.mintDark, bg: '#DCFCE7' },
+    { label: '最長連続', value: String(streak.longest), unit: '日', color: DL.primary, bg: '#FFEDD5' },
+    { label: '完了レッスン', value: String(totalCompleted), unit: '本', color: DL.mintDark, bg: '#DCFCE7' },
   ];
   const badges: Badge[] = [
     { icon: '🎯', label: '目標設定', unlocked: false, color: DL.primary },
@@ -120,11 +138,11 @@ export function ProfileScreen() {
                 連続記録
               </div>
               <div className="flex items-baseline gap-1 mt-0.5">
-                <div className="text-4xl font-black text-dl-fire leading-none tabular-nums">0</div>
+                <div className="text-4xl font-black text-dl-fire leading-none tabular-nums">{streak.current}</div>
                 <div className="text-sm font-extrabold text-dl-slate font-jp">日連続</div>
               </div>
               <div className="text-[11px] font-bold text-dl-slate font-jp mt-1">
-                最長記録 <span className="text-dl-navy font-black">0日</span>
+                最長記録 <span className="text-dl-navy font-black">{streak.longest}日</span>
               </div>
             </div>
           </div>

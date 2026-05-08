@@ -1,7 +1,6 @@
 import { DL } from '../lib/dl';
 import { useNav, type RouteName } from '../lib/nav';
 import { AppIcon } from './AppIcon';
-import { Flame } from './Flame';
 
 type Item = {
   id: RouteName;
@@ -102,17 +101,6 @@ export function Sidebar() {
       </nav>
 
       <div className="flex-1" />
-
-      <div className="flex items-center gap-3 px-3.5 py-3 rounded-2xl border-[1.5px] border-[#FED7AA] shadow-[0_3px_0_#F0E2CD] bg-gradient-to-br from-[#FFF7ED] to-[#FFEDD5]">
-        <Flame size={36} />
-        <div>
-          <div className="text-[10px] font-extrabold text-dl-fire-dark tracking-wider font-jp">連続記録</div>
-          <div className="flex items-baseline gap-1 mt-0.5">
-            <div className="text-[22px] font-black text-dl-fire leading-none tabular-nums">12</div>
-            <div className="text-[11px] font-extrabold text-dl-slate font-jp">日連続</div>
-          </div>
-        </div>
-      </div>
     </aside>
   );
 }

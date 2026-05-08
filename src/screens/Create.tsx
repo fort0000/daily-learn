@@ -5,6 +5,7 @@ import { Phone } from '../components/Phone';
 import { StatusBar } from '../components/StatusBar';
 import { TabBar } from '../components/TabBar';
 import { PushButton } from '../components/PushButton';
+import { startCourseGeneration } from '../lib/db';
 
 const inputClass =
   'w-full box-border bg-white border-[1.5px] border-dl-border rounded-2xl px-3.5 py-3 text-sm font-bold text-dl-navy font-jp outline-none';
@@ -14,8 +15,32 @@ export function CreateScreen() {
   const [field, setField] = useState('');
   const [prerequisite, setPrerequisite] = useState('');
   const [goal, setGoal] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const canSubmit = field.trim().length > 0 && goal.trim().length > 0;
+  const canSubmit =
+    !submitting && field.trim().length > 0 && goal.trim().length > 0;
+
+  const handleSubmit = async () => {
+    if (!canSubmit) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      const { course_id } = await startCourseGeneration({
+        field: field.trim(),
+        prerequisite: prerequisite.trim() || null,
+        goal: goal.trim(),
+      });
+      // Navigate immediately. Home subscribes to the courses table via
+      // Realtime; the card flips to its "ready" state on its own when the
+      // background generation finishes.
+      navigate('home', { newCourseId: course_id });
+    } catch (e) {
+      console.error('[Create] startCourseGeneration failed:', e);
+      setError(e instanceof Error ? e.message : 'コースの作成リクエストに失敗しました');
+      setSubmitting(false);
+    }
+  };
 
   return (
     <Phone>
@@ -48,7 +73,7 @@ export function CreateScreen() {
             何を学びたい？
           </h1>
           <div className="text-xs text-dl-slate font-jp leading-[1.5]">
-            いくつか答えるだけで、AIが30日のコースを設計します。
+            いくつか答えるだけで、AIが30日のコースを設計します。生成は裏側で進むので、ボタンを押したらホームに戻ってもOKです。
           </div>
         </div>
 
@@ -58,6 +83,7 @@ export function CreateScreen() {
             onChange={(e) => setField(e.target.value)}
             placeholder="学びたい分野を入力"
             className={inputClass}
+            disabled={submitting}
           />
         </Field>
 
@@ -71,6 +97,7 @@ export function CreateScreen() {
             placeholder="例: HTML/CSSは書ける / 簿記3級は持っている"
             rows={2}
             className={`${inputClass} resize-none leading-[1.5]`}
+            disabled={submitting}
           />
         </Field>
 
@@ -81,16 +108,23 @@ export function CreateScreen() {
             placeholder="例: 月3万円の副業収入を作る / 簡単なWebアプリを公開する"
             rows={3}
             className={`${inputClass} resize-none leading-[1.5]`}
+            disabled={submitting}
           />
         </Field>
+
+        {error && (
+          <div className="mt-2 px-3.5 py-2.5 rounded-2xl border-[1.5px] border-[#FCA5A5] bg-[#FEF2F2] text-[12px] font-bold text-[#B91C1C] font-jp leading-[1.5]">
+            {error}
+          </div>
+        )}
       </div>
 
       <div className="absolute bottom-6 left-4 right-4 z-20">
         <div
           className={`${canSubmit ? 'opacity-100 pointer-events-auto' : 'opacity-45 pointer-events-none'}`}
         >
-          <PushButton color={DL.primary} shadow={DL.primaryShadow} fontSize={16} onClick={() => navigate('home')}>
-            ✨ コースを作成する
+          <PushButton color={DL.primary} shadow={DL.primaryShadow} fontSize={16} onClick={handleSubmit}>
+            {submitting ? '送信中…' : 'コースを作成する'}
           </PushButton>
         </div>
       </div>

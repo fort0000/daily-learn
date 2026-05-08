@@ -2,6 +2,7 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type TouchEvent as RTouchEvent,
@@ -14,57 +15,149 @@ import { StatusBar } from '../components/StatusBar';
 import { TabBar } from '../components/TabBar';
 import { Flame } from '../components/Flame';
 import { PushButton } from '../components/PushButton';
+import {
+  archiveCourse,
+  fetchActiveCourses,
+  fetchLessonsByCourse,
+  fetchRecentCompletions,
+  getStreak,
+  startCourseGeneration,
+  subscribeToCourses,
+  type Course,
+  type Lesson,
+} from '../lib/db';
+import { bucketCompletedByJstDate, buildWeek, formatJstHeaderDate } from '../lib/week';
 
-type Lesson = {
-  day: number;
-  status: 'today' | 'tomorrow' | 'soon';
-  eyebrow: string;
-  title: [string, string];
-  summary: string;
-  cta: string;
+type Palette = {
   color: string;
   shadow: string;
-  chip: { bg: string; dot: string; fg: string; label: string };
+  chip: { bg: string; dot: string; fg: string };
   blob: string;
-  planId: string;
+};
+
+const PALETTES: Palette[] = [
+  {
+    color: DL.primary,
+    shadow: DL.primaryShadow,
+    chip: { bg: '#FFEDD5', dot: DL.fire, fg: DL.fireDark },
+    blob: '#FFE4D1',
+  },
+  {
+    color: DL.mint,
+    shadow: DL.mintShadow,
+    chip: { bg: '#DCFCE7', dot: DL.mint, fg: DL.mintDark },
+    blob: '#D1FAE5',
+  },
+  {
+    color: '#A855F7',
+    shadow: '#7E22CE',
+    chip: { bg: '#EDE9FE', dot: '#A855F7', fg: '#6D28D9' },
+    blob: '#EDE9FE',
+  },
+];
+
+type CourseCard = {
+  course: Course;
+  // null when course is generating, failed, or has no remaining lessons.
+  lesson: Lesson | null;
+  palette: Palette;
 };
 
 export function HomeScreen() {
-  const { navigate } = useNav();
-  const days = [
-    { d: '月', done: true },
-    { d: '火', done: true },
-    { d: '水', done: true },
-    { d: '木', done: true },
-    { d: '金', done: false, today: true },
-    { d: '土', done: false },
-    { d: '日', done: false },
-  ];
+  const [cards, setCards] = useState<CourseCard[] | null>(null);
+  const [streak, setStreak] = useState({ current: 0, longest: 0 });
+  const [completedSet, setCompletedSet] = useState<Set<string>>(() => new Set());
+
+  const load = useCallback(async () => {
+    try {
+      const [courses, completions, s] = await Promise.all([
+        fetchActiveCourses(),
+        fetchRecentCompletions(8),
+        getStreak(),
+      ]);
+      setStreak(s);
+      setCompletedSet(bucketCompletedByJstDate(completions));
+
+      const lessonLists = await Promise.all(
+        courses.map((c) =>
+          c.status === 'active' || c.status === 'completed'
+            ? fetchLessonsByCourse(c.id)
+            : Promise.resolve<Lesson[]>([]),
+        ),
+      );
+      const built: CourseCard[] = [];
+      courses.forEach((course, i) => {
+        const lessons = lessonLists[i] ?? [];
+        const next = lessons.find((l) => l.completed_at == null) ?? null;
+        // For 'active' courses with every lesson completed, we have nothing
+        // useful to show — skip the card entirely. Generating/failed always
+        // surface so the user can see progress / retry.
+        if (course.status === 'active' && !next) return;
+        built.push({
+          course,
+          lesson: next,
+          palette: PALETTES[built.length % PALETTES.length]!,
+        });
+      });
+      setCards(built);
+    } catch (e) {
+      console.error('[Home] load failed:', e);
+      setCards([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    void load().then(() => {
+      if (!active) return;
+    });
+    // Any change to the user's `courses` rows (insert from courses-generate,
+    // status flip from generating → active / failed, archive) triggers a full
+    // refresh. Cheap enough; keeps the state machine trivial.
+    const unsubscribe = subscribeToCourses(() => {
+      if (!active) return;
+      void load();
+    });
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, [load]);
+
+  const week = useMemo(() => buildWeek(new Date(), completedSet), [completedSet]);
+  const doneCount = week.filter((d) => d.done).length;
+  const headerDate = useMemo(() => formatJstHeaderDate(new Date()), []);
 
   return (
     <Phone>
       <StatusBar />
       <div className="pt-1 px-5 pr-[76px]">
-        <div className="text-[13px] text-dl-slate font-bold tracking-[0.5px]">5月3日(金)</div>
+        <div className="text-[13px] text-dl-slate font-bold tracking-[0.5px]">{headerDate}</div>
         <div className="flex gap-2 items-center mt-2.5 flex-wrap">
           <div className="bg-white rounded-full pl-1.5 pr-2.5 py-1 flex items-center gap-1 shadow-[0_0_0_2px_#F97316]">
             <Flame size={22} />
-            <div className="text-[13px] font-black text-dl-fire tabular-nums">12</div>
+            <div className="text-[13px] font-black text-dl-fire tabular-nums">{streak.current}</div>
             <div className="text-[10px] font-extrabold text-dl-slate font-jp">日連続</div>
           </div>
         </div>
       </div>
 
-      <LessonCarousel />
+      {cards === null ? (
+        <CarouselSkeleton />
+      ) : cards.length === 0 ? (
+        <EmptyCarousel />
+      ) : (
+        <LessonCarousel cards={cards} onChanged={load} />
+      )}
 
       <div className="pt-[18px] px-5">
         <div className="flex justify-between items-baseline mb-2.5">
           <div className="text-sm font-extrabold text-dl-navy font-jp">今週の学習</div>
-          <div className="text-[11px] font-extrabold text-dl-mint-dark font-jp">4 / 7 日</div>
+          <div className="text-[11px] font-extrabold text-dl-mint-dark font-jp">{doneCount} / 7 日</div>
         </div>
         <div className="flex gap-1.5 justify-between">
-          {days.map((d, i) => (
-            <div key={i} className="flex-1 flex flex-col items-center gap-1">
+          {week.map((d) => (
+            <div key={d.date} className="flex-1 flex flex-col items-center gap-1">
               <div
                 className={`w-9 h-9 rounded-full flex items-center justify-center font-black text-[13px] ${
                   d.done
@@ -96,83 +189,74 @@ export function HomeScreen() {
                   d.today ? 'text-dl-primary' : 'text-dl-slate-light'
                 }`}
               >
-                {d.d}
+                {d.label}
               </div>
             </div>
           ))}
         </div>
       </div>
 
-      <div className="pt-3.5 px-5">
-        <button
-          onClick={() => navigate('create')}
-          className="w-full bg-white border-2 border-dashed border-dl-primary rounded-[20px] px-4 py-3.5 flex items-center gap-3 cursor-pointer font-jp text-left"
-        >
-          <div className="w-11 h-11 rounded-[14px] bg-dl-primary flex items-center justify-center shadow-[0_3px_0_#C8431A] shrink-0">
-            <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-              <path d="M11 4 V18 M4 11 H18" stroke="#fff" strokeWidth="3" strokeLinecap="round" />
-            </svg>
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="text-sm font-black text-dl-navy">新しい学習コースを作る</div>
-            <div className="text-[11px] font-bold text-dl-slate mt-0.5">目標を入力 → AIがコースを設計</div>
-          </div>
-        </button>
-      </div>
-
+      <NewCourseCTA />
       <TabBar active="home" />
     </Phone>
   );
 }
 
-function LessonCarousel() {
+function NewCourseCTA() {
   const { navigate } = useNav();
-  const lessons: Lesson[] = [
-    {
-      day: 12,
-      status: 'today',
-      eyebrow: '今日のレッスン',
-      title: ['競合分析の基本', 'フレームワーク'],
-      summary: '3C・4P・SWOTを使い分けて、市場のスキマを見つける方法。今日は3Cから始めよう。',
-      cta: '今日の学びを始める →',
-      color: DL.primary,
-      shadow: DL.primaryShadow,
-      chip: { bg: '#FFEDD5', dot: DL.fire, fg: DL.fireDark, label: 'DAY 12 / 30' },
-      blob: '#FFE4D1',
-      planId: 'side-business',
-    },
-    {
-      day: 13,
-      status: 'tomorrow',
-      eyebrow: '今日のレッスン',
-      title: ['顧客インタビュー', 'の作り方'],
-      summary: '5人に聞くだけで仮説の8割は検証できる。質問リストを準備しよう。',
-      cta: '今日の学びを始める →',
-      color: DL.mint,
-      shadow: DL.mintShadow,
-      chip: { bg: '#DCFCE7', dot: DL.mint, fg: DL.mintDark, label: 'DAY 13 / 30' },
-      blob: '#D1FAE5',
-      planId: 'interview',
-    },
-    {
-      day: 14,
-      status: 'soon',
-      eyebrow: '今日のレッスン',
-      title: ['価格設定の', 'やさしい考え方'],
-      summary: 'コスト基準・市場基準・価値基準。3つの軸でブレずに値段を決める。',
-      cta: '今日の学びを始める →',
-      color: '#A855F7',
-      shadow: '#7E22CE',
-      chip: { bg: '#EDE9FE', dot: '#A855F7', fg: '#6D28D9', label: 'DAY 14 / 30' },
-      blob: '#EDE9FE',
-      planId: 'pricing',
-    },
-  ];
+  return (
+    <div className="pt-3.5 px-5">
+      <button
+        onClick={() => navigate('create')}
+        className="w-full bg-white border-2 border-dashed border-dl-primary rounded-[20px] px-4 py-3.5 flex items-center gap-3 cursor-pointer font-jp text-left"
+      >
+        <div className="w-11 h-11 rounded-[14px] bg-dl-primary flex items-center justify-center shadow-[0_3px_0_#C8431A] shrink-0">
+          <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+            <path d="M11 4 V18 M4 11 H18" stroke="#fff" strokeWidth="3" strokeLinecap="round" />
+          </svg>
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-black text-dl-navy">新しい学習コースを作る</div>
+          <div className="text-[11px] font-bold text-dl-slate mt-0.5">目標を入力 → AIがコースを設計</div>
+        </div>
+      </button>
+    </div>
+  );
+}
 
+function CarouselSkeleton() {
+  return (
+    <div className="pt-5 px-9">
+      <div className="bg-white rounded-3xl border-[1.5px] border-dl-border h-[260px] animate-pulse" />
+    </div>
+  );
+}
+
+function EmptyCarousel() {
+  return (
+    <div className="pt-5 px-9">
+      <div className="bg-white rounded-3xl border-[1.5px] border-dashed border-dl-border px-5 py-7 text-center">
+        <div className="text-[13px] font-extrabold text-dl-navy font-jp">
+          まだコースがありません
+        </div>
+        <div className="text-[11px] font-bold text-dl-slate font-jp mt-1.5 leading-[1.6]">
+          下のボタンから最初のコースを作ってみよう。
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LessonCarousel({ cards, onChanged }: { cards: CourseCard[]; onChanged: () => void }) {
   const [idx, setIdx] = useState(0);
   const [shift, setShift] = useState(0);
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const trackRef = useRef<HTMLDivElement | null>(null);
+
+  // Keep `idx` in range as the cards array shrinks (e.g., archive).
+  useEffect(() => {
+    if (idx > cards.length - 1) setIdx(Math.max(0, cards.length - 1));
+  }, [cards.length, idx]);
 
   const recenter = useCallback(() => {
     const viewport = viewportRef.current;
@@ -215,9 +299,10 @@ function LessonCarousel() {
     const x = getX(e);
     const dx = x - startX.current;
     if (dx > 40 && idx > 0) setIdx(idx - 1);
-    else if (dx < -40 && idx < lessons.length - 1) setIdx(idx + 1);
+    else if (dx < -40 && idx < cards.length - 1) setIdx(idx + 1);
     startX.current = null;
   };
+  const wasDragging = () => moved.current;
 
   return (
     <div className="pt-5">
@@ -239,112 +324,266 @@ function LessonCarousel() {
           className="flex gap-3 px-9 transition-transform duration-[320ms] ease-[cubic-bezier(.2,.7,.3,1)]"
           style={{ transform: `translateX(${shift}px)` }}
         >
-          {lessons.map((l, i) => (
+          {cards.map((card, i) => (
             <div
-              key={i}
+              key={card.course.id}
               className="flex-[0_0_calc(100%-48px)] box-border transition-[opacity,transform] duration-[220ms]"
               style={{
                 opacity: i === idx ? 1 : 0.55,
                 transform: i === idx ? 'scale(1)' : 'scale(0.96)',
               }}
             >
-              <div
-                className="bg-white rounded-3xl pt-[18px] px-5 pb-[22px] border-[1.5px] border-dl-border shadow-[0_4px_0_#F0E2CD] relative overflow-hidden"
-                style={{ opacity: l.status === 'soon' ? 0.95 : 1 }}
-              >
-                <div
-                  className="absolute -top-10 -right-[30px] w-[120px] h-[120px] rounded-full opacity-70"
-                  style={{
-                    background: `radial-gradient(circle, ${l.blob} 0%, ${l.blob} 60%, transparent 70%)`,
-                  }}
-                />
-                <div className="flex items-center justify-between relative">
-                  <div
-                    className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-black tracking-[0.5px]"
-                    style={{ background: l.chip.bg, color: l.chip.fg }}
-                  >
-                    <span
-                      className="w-1.5 h-1.5 rounded-full"
-                      style={{ background: l.chip.dot }}
-                    />
-                    {l.chip.label}
-                  </div>
-                  <div className="text-[11px] font-extrabold text-dl-slate font-jp">⏱ 約10分</div>
-                </div>
-                <div className="mt-3.5 text-[11px] font-extrabold text-dl-slate-light tracking-wider font-jp">
-                  {l.eyebrow}
-                </div>
-                <div className="mt-1 text-[23px] font-black text-dl-navy font-jp leading-[1.25] tracking-[-0.3px]">
-                  {l.title[0]}
-                  <br />
-                  {l.title[1]}
-                </div>
-                <div className="mt-2 text-[13px] text-dl-slate leading-[1.6] font-jp">{l.summary}</div>
-                <div className="mt-[18px]">
-                  <PushButton
-                    color={l.color}
-                    shadow={l.shadow}
-                    fontSize={16}
-                    onClick={() => {
-                      if (!moved.current) navigate('article', { planId: l.planId, day: l.day });
-                    }}
-                  >
-                    {l.cta}
-                  </PushButton>
-                </div>
-                <div
-                  onClick={() => {
-                    if (!moved.current) navigate('roadmap', { planId: l.planId });
-                  }}
-                  className="mt-3.5 flex items-center justify-between pt-3 border-t border-dashed border-dl-border cursor-pointer"
-                >
-                  <div className="flex items-center gap-2">
-                    <div
-                      className="w-7 h-7 rounded-lg flex items-center justify-center"
-                      style={{ background: l.chip.bg }}
-                    >
-                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                        <path
-                          d="M3 4 Q8 4 8 8 Q8 12 13 12"
-                          stroke={l.chip.fg}
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          fill="none"
-                        />
-                        <circle cx="3" cy="4" r="1.6" fill={l.chip.fg} />
-                        <circle cx="13" cy="12" r="1.6" fill={l.chip.fg} />
-                      </svg>
-                    </div>
-                    <div className="text-xs font-extrabold text-dl-navy font-jp">
-                      このコースのロードマップ
-                    </div>
-                  </div>
-                  <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
-                    <path
-                      d="M7 4 L13 10 L7 16"
-                      stroke={l.chip.fg}
-                      strokeWidth="2.6"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </div>
-              </div>
+              <CardBody card={card} wasDragging={wasDragging} onChanged={onChanged} />
             </div>
           ))}
         </div>
       </div>
-      <div className="flex justify-center gap-1.5 mt-3">
-        {lessons.map((_, i) => (
-          <div
-            key={i}
-            onClick={() => setIdx(i)}
-            className={`h-[7px] rounded-full transition-all duration-200 cursor-pointer ${
-              i === idx ? 'w-[22px] bg-dl-primary' : 'w-[7px] bg-[#E5DCC8]'
-            }`}
-          />
-        ))}
-      </div>
+      {cards.length > 1 && (
+        <div className="flex justify-center gap-1.5 mt-3">
+          {cards.map((c, i) => (
+            <div
+              key={c.course.id}
+              onClick={() => setIdx(i)}
+              className={`h-[7px] rounded-full transition-all duration-200 cursor-pointer ${
+                i === idx ? 'w-[22px] bg-dl-primary' : 'w-[7px] bg-[#E5DCC8]'
+              }`}
+            />
+          ))}
+        </div>
+      )}
     </div>
+  );
+}
+
+function CardBody({
+  card,
+  wasDragging,
+  onChanged,
+}: {
+  card: CourseCard;
+  wasDragging: () => boolean;
+  onChanged: () => void;
+}) {
+  if (card.course.status === 'generating') {
+    return <GeneratingCard card={card} />;
+  }
+  if (card.course.status === 'failed') {
+    return <FailedCard card={card} onChanged={onChanged} />;
+  }
+  if (!card.lesson) return null; // active-but-no-lesson is filtered upstream
+  return <ActiveCard card={card} lesson={card.lesson} wasDragging={wasDragging} />;
+}
+
+function CardShell({
+  palette,
+  children,
+}: {
+  palette: Palette;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="bg-white rounded-3xl pt-[18px] px-5 pb-[22px] border-[1.5px] border-dl-border shadow-[0_4px_0_#F0E2CD] relative overflow-hidden">
+      <div
+        className="absolute -top-10 -right-[30px] w-[120px] h-[120px] rounded-full opacity-70"
+        style={{
+          background: `radial-gradient(circle, ${palette.blob} 0%, ${palette.blob} 60%, transparent 70%)`,
+        }}
+      />
+      {children}
+    </div>
+  );
+}
+
+function ActiveCard({
+  card,
+  lesson,
+  wasDragging,
+}: {
+  card: CourseCard;
+  lesson: Lesson;
+  wasDragging: () => boolean;
+}) {
+  const { navigate } = useNav();
+  const { course, palette } = card;
+
+  return (
+    <CardShell palette={palette}>
+      <div className="flex items-center justify-between relative">
+        <div
+          className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-black tracking-[0.5px]"
+          style={{ background: palette.chip.bg, color: palette.chip.fg }}
+        >
+          <span className="w-1.5 h-1.5 rounded-full" style={{ background: palette.chip.dot }} />
+          DAY {lesson.day} / 30
+        </div>
+        <div className="text-[11px] font-extrabold text-dl-slate font-jp">⏱ 約10分</div>
+      </div>
+      <div className="mt-3.5 text-[11px] font-extrabold text-dl-slate-light tracking-wider font-jp">
+        {course.title}
+      </div>
+      <div className="mt-1 text-[23px] font-black text-dl-navy font-jp leading-[1.25] tracking-[-0.3px]">
+        {lesson.title}
+      </div>
+      <div className="mt-2 text-[13px] text-dl-slate leading-[1.6] font-jp">{lesson.summary}</div>
+      <div className="mt-[18px]">
+        <PushButton
+          color={palette.color}
+          shadow={palette.shadow}
+          fontSize={16}
+          onClick={() => {
+            if (!wasDragging()) navigate('article', { lessonId: lesson.id });
+          }}
+        >
+          今日の学びを始める →
+        </PushButton>
+      </div>
+      <div
+        onClick={() => {
+          if (!wasDragging()) navigate('roadmap', { courseId: course.id });
+        }}
+        className="mt-3.5 flex items-center justify-between pt-3 border-t border-dashed border-dl-border cursor-pointer"
+      >
+        <div className="flex items-center gap-2">
+          <div
+            className="w-7 h-7 rounded-lg flex items-center justify-center"
+            style={{ background: palette.chip.bg }}
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path
+                d="M3 4 Q8 4 8 8 Q8 12 13 12"
+                stroke={palette.chip.fg}
+                strokeWidth="2"
+                strokeLinecap="round"
+                fill="none"
+              />
+              <circle cx="3" cy="4" r="1.6" fill={palette.chip.fg} />
+              <circle cx="13" cy="12" r="1.6" fill={palette.chip.fg} />
+            </svg>
+          </div>
+          <div className="text-xs font-extrabold text-dl-navy font-jp">
+            このコースのロードマップ
+          </div>
+        </div>
+        <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
+          <path
+            d="M7 4 L13 10 L7 16"
+            stroke={palette.chip.fg}
+            strokeWidth="2.6"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </div>
+    </CardShell>
+  );
+}
+
+function GeneratingCard({ card }: { card: CourseCard }) {
+  const { palette, course } = card;
+  return (
+    <CardShell palette={palette}>
+      <div className="flex items-center justify-between relative">
+        <div
+          className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-black tracking-[0.5px] animate-pulse"
+          style={{ background: palette.chip.bg, color: palette.chip.fg }}
+        >
+          <span
+            className="w-1.5 h-1.5 rounded-full"
+            style={{ background: palette.chip.dot }}
+          />
+          作成中…
+        </div>
+        <div className="text-[11px] font-extrabold text-dl-slate font-jp">⏱ 約30〜60秒</div>
+      </div>
+      <div className="mt-3.5 text-[11px] font-extrabold text-dl-slate-light tracking-wider font-jp">
+        {course.field}
+      </div>
+      <div className="mt-1 text-[19px] font-black text-dl-navy font-jp leading-[1.25] tracking-[-0.3px]">
+        AIが30日コースを設計しています
+      </div>
+      <div className="mt-2 space-y-2">
+        <div className="h-3 bg-[#F5EDDF] rounded-full animate-pulse" />
+        <div className="h-3 w-4/5 bg-[#F5EDDF] rounded-full animate-pulse" />
+        <div className="h-3 w-2/3 bg-[#F5EDDF] rounded-full animate-pulse" />
+      </div>
+      <div className="mt-[18px] opacity-60 pointer-events-none">
+        <PushButton color={palette.color} shadow={palette.shadow} fontSize={16} onClick={() => {}}>
+          準備中…
+        </PushButton>
+      </div>
+      <div className="mt-3.5 pt-3 border-t border-dashed border-dl-border text-[11px] font-bold text-dl-slate font-jp leading-[1.6]">
+        生成中はこの画面を閉じてもOKです。完成すると自動でカードが切り替わります。
+      </div>
+    </CardShell>
+  );
+}
+
+function FailedCard({ card, onChanged }: { card: CourseCard; onChanged: () => void }) {
+  const { course, palette } = card;
+  const [busy, setBusy] = useState<'retry' | 'dismiss' | null>(null);
+
+  const handleRetry = async () => {
+    if (busy) return;
+    setBusy('retry');
+    try {
+      // Archive the failed row first so we don't accumulate duplicates, then
+      // re-issue the same generation request.
+      await archiveCourse(course.id);
+      await startCourseGeneration({
+        field: course.field,
+        prerequisite: course.prerequisite,
+        goal: course.goal,
+      });
+      onChanged();
+    } catch (e) {
+      console.error('[Home] retry failed:', e);
+      setBusy(null);
+    }
+  };
+  const handleDismiss = async () => {
+    if (busy) return;
+    setBusy('dismiss');
+    try {
+      await archiveCourse(course.id);
+      onChanged();
+    } catch (e) {
+      console.error('[Home] dismiss failed:', e);
+      setBusy(null);
+    }
+  };
+
+  return (
+    <CardShell palette={palette}>
+      <div className="flex items-center justify-between relative">
+        <div className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-black tracking-[0.5px] bg-[#FEE2E2] text-[#B91C1C]">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#DC2626]" />
+          作成に失敗
+        </div>
+      </div>
+      <div className="mt-3.5 text-[11px] font-extrabold text-dl-slate-light tracking-wider font-jp">
+        {course.field}
+      </div>
+      <div className="mt-1 text-[19px] font-black text-dl-navy font-jp leading-[1.25] tracking-[-0.3px]">
+        コースの作成に失敗しました
+      </div>
+      <div className="mt-2 text-[12px] text-dl-slate leading-[1.6] font-jp">
+        {course.generation_error?.trim()
+          ? course.generation_error
+          : '通信またはAI応答に問題が発生しました。'}
+      </div>
+      <div className={`mt-[18px] ${busy ? 'opacity-60 pointer-events-none' : ''}`}>
+        <PushButton color={palette.color} shadow={palette.shadow} fontSize={15} onClick={handleRetry}>
+          {busy === 'retry' ? '再試行中…' : '🔄 もう一度作成する'}
+        </PushButton>
+      </div>
+      <div
+        onClick={handleDismiss}
+        className={`mt-3 text-center text-[12px] font-extrabold text-dl-slate-light font-jp cursor-pointer ${
+          busy ? 'opacity-60 pointer-events-none' : ''
+        }`}
+      >
+        {busy === 'dismiss' ? '削除中…' : '削除する'}
+      </div>
+    </CardShell>
   );
 }

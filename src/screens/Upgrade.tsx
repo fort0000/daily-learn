@@ -22,7 +22,7 @@ export function UpgradeScreen() {
   const [billing, setBilling] = useState<BillingCadence>('monthly');
   const [submitting, setSubmitting] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
-  const [changingCadence, setChangingCadence] = useState(false);
+  const [cadenceSheetOpen, setCadenceSheetOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -88,30 +88,9 @@ export function UpgradeScreen() {
     }
   };
 
-  const handleChangeCadence = async () => {
-    if (changingCadence) return;
+  const handleChangeCadence = () => {
     setError(null);
-    setChangingCadence(true);
-    try {
-      const result = await changeBillingCadence(billing);
-      setProfile((p) =>
-        p
-          ? {
-              ...p,
-              subscription_billing: result.billing,
-              subscription_period_end: result.period_end,
-              // Plan switch clears any pending cancellation.
-              subscription_cancel_at: null,
-            }
-          : p,
-      );
-      refresh();
-    } catch (err) {
-      console.error('[Upgrade] change cadence failed:', err);
-      setError(err instanceof Error ? err.message : 'プラン変更に失敗しました');
-    } finally {
-      setChangingCadence(false);
-    }
+    setCadenceSheetOpen(true);
   };
 
   return (
@@ -400,11 +379,7 @@ export function UpgradeScreen() {
                   currently showing. */}
               {isPaid ? (
                 currentCadence && billing !== currentCadence ? (
-                  <ChangeCadenceCTA
-                    target={billing}
-                    loading={changingCadence}
-                    onChange={handleChangeCadence}
-                  />
+                  <ChangeCadenceCTA target={billing} onChange={handleChangeCadence} />
                 ) : (
                   <PaidStatusBox
                     profile={profile}
@@ -554,45 +529,243 @@ export function UpgradeScreen() {
           }}
         />
       )}
+
+      {cadenceSheetOpen && (
+        <CadenceChangeSheet
+          target={billing}
+          currentCadence={currentCadence}
+          onClose={() => setCadenceSheetOpen(false)}
+          onConfirmed={(result) => {
+            setProfile((p: Profile | null) =>
+              p
+                ? {
+                    ...p,
+                    subscription_billing: result.billing,
+                    subscription_period_end: result.period_end,
+                    // Plan switch clears any pending cancellation.
+                    subscription_cancel_at: null,
+                  }
+                : p,
+            );
+            refresh();
+          }}
+        />
+      )}
     </Phone>
   );
 }
 
 function ChangeCadenceCTA({
   target,
-  loading,
   onChange,
 }: {
   target: BillingCadence;
-  loading: boolean;
   onChange: () => void;
 }) {
   const label =
     target === 'yearly' ? '年額プランにアップグレードする' : '月額プランに変更する';
-  const note =
-    target === 'yearly'
-      ? '差額を即時計算 · 2ヶ月分お得になります'
-      : '残期間のクレジットを今後の月額に自動充当';
   return (
-    <>
-      <div className={`mt-3.5 ${loading ? 'opacity-60 pointer-events-none' : ''}`}>
-        <PushButton
-          color={DL.primary}
-          shadow={DL.primaryShadow}
-          fontSize={15}
-          height={54}
-          onClick={onChange}
-        >
-          {loading ? '変更中…' : `${label} →`}
-        </PushButton>
-      </div>
-      <div
-        className="mt-2 text-center text-[10px] font-bold font-jp"
-        style={{ color: '#FFD7B5', opacity: 0.7 }}
+    <div className="mt-3.5">
+      <PushButton
+        color={DL.primary}
+        shadow={DL.primaryShadow}
+        fontSize={15}
+        height={54}
+        onClick={onChange}
       >
-        {note}
+        {label} →
+      </PushButton>
+    </div>
+  );
+}
+
+function CadenceChangeSheet({
+  target,
+  currentCadence,
+  onClose,
+  onConfirmed,
+}: {
+  target: BillingCadence;
+  currentCadence: BillingCadence | null;
+  onClose: () => void;
+  onConfirmed: (result: { billing: BillingCadence; period_end: string | null }) => void;
+}) {
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [view, setView] = useState<'confirm' | 'success'>('confirm');
+  const [closing, setClosing] = useState(false);
+
+  const isUpgrade = target === 'yearly' && currentCadence === 'monthly';
+  const targetLabel = target === 'yearly' ? '年額プラン' : '月額プラン';
+
+  const triggerClose = () => {
+    if (closing) return;
+    setClosing(true);
+    window.setTimeout(onClose, SHEET_EXIT_MS);
+  };
+
+  const handleConfirm = async () => {
+    if (submitting) return;
+    setError(null);
+    setSubmitting(true);
+    try {
+      const result = await changeBillingCadence(target);
+      onConfirmed(result);
+      setView('success');
+    } catch (err) {
+      console.error('[CadenceChangeSheet] change failed:', err);
+      setError(err instanceof Error ? err.message : 'プラン変更に失敗しました');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div
+      onClick={closing ? undefined : triggerClose}
+      className={`absolute inset-0 flex items-end z-30 ${
+        closing ? 'animate-dlbackdropfadeout' : 'animate-dlbackdropfade'
+      }`}
+      style={{ background: 'rgba(15,23,42,0.45)' }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className={`w-full bg-white px-5 pt-3.5 pb-[22px] font-jp ${
+          closing ? 'animate-dlsheetdown' : 'animate-dlsheetup'
+        }`}
+        style={{
+          borderRadius: '24px 24px 0 0',
+          boxShadow: '0 -8px 32px rgba(15,23,42,0.18)',
+        }}
+      >
+        <div
+          className="mx-auto mb-3.5"
+          style={{ width: 40, height: 4, borderRadius: 999, background: '#E5DCC8' }}
+        />
+
+        {view === 'confirm' ? (
+          <>
+            <div
+              className="text-[18px] font-black text-dl-navy font-jp"
+              style={{ lineHeight: 1.3, letterSpacing: -0.3 }}
+            >
+              {targetLabel}に変更しますか？
+            </div>
+            <div className="mt-1.5 text-[12px] font-bold text-dl-slate font-jp leading-[1.6]">
+              {isUpgrade
+                ? '残り月額分のクレジットを差し引いた金額を即時に引き落とし、新しい年額サイクルが今日からスタートします。'
+                : '年額の残期間分をクレジットとしてお預かりし、今後の月額に自動で充当されます。当面はカードに引き落としは発生しません。'}
+            </div>
+
+            <div
+              className="mt-3.5 px-3.5 py-3"
+              style={{
+                background: '#FAF5EC',
+                border: `1.5px solid ${DL.border}`,
+                borderRadius: 16,
+              }}
+            >
+              <div className="flex items-center justify-between">
+                <div className="text-[11px] font-extrabold text-dl-slate-light font-jp tracking-wider">
+                  変更後のプラン
+                </div>
+              </div>
+              <div className="mt-1.5 flex items-baseline gap-1.5">
+                <div className="text-[20px] font-black text-dl-navy font-jp tabular-nums">
+                  ¥{target === 'yearly' ? '9,800' : '980'}
+                </div>
+                <div className="text-[12px] font-extrabold text-dl-slate font-jp">
+                  / {target === 'yearly' ? '年' : '月'}
+                </div>
+                {target === 'yearly' && (
+                  <div
+                    className="ml-auto text-[10px] font-black text-white font-jp"
+                    style={{
+                      background: 'linear-gradient(90deg, #22C55E, #16A34A)',
+                      letterSpacing: 0.4,
+                      padding: '4px 8px',
+                      borderRadius: 999,
+                      boxShadow: '0 2px 0 #0F7A38',
+                    }}
+                  >
+                    2ヶ月分お得
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {error && (
+              <div className="mt-3 px-3.5 py-2.5 rounded-2xl border-[1.5px] border-[#FCA5A5] bg-[#FEF2F2] text-[12px] font-bold text-[#B91C1C] font-jp leading-[1.5]">
+                {error}
+              </div>
+            )}
+
+            <div className="mt-4 flex flex-col gap-2.5">
+              <div className={submitting ? 'opacity-60 pointer-events-none' : ''}>
+                <PushButton
+                  color={DL.primary}
+                  shadow={DL.primaryShadow}
+                  fontSize={15}
+                  height={54}
+                  onClick={handleConfirm}
+                >
+                  {submitting ? '変更中…' : `${targetLabel}に変更する`}
+                </PushButton>
+              </div>
+              <div
+                onClick={triggerClose}
+                className={`text-center text-[13px] font-extrabold py-2.5 cursor-pointer ${
+                  submitting ? 'opacity-50 pointer-events-none' : ''
+                }`}
+                style={{ color: DL.slate }}
+              >
+                キャンセル
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="pt-2 pb-1 text-center">
+            <div
+              className="mx-auto w-[64px] h-[64px] rounded-full flex items-center justify-center"
+              style={{
+                background: '#DCFCE7',
+                boxShadow: '0 4px 0 #BBF7D0',
+              }}
+            >
+              <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+                <path
+                  d="M8 16 L14 22 L24 10"
+                  stroke={DL.mintDark}
+                  strokeWidth="3.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </div>
+            <div
+              className="mt-4 text-[18px] font-black text-dl-navy font-jp"
+              style={{ lineHeight: 1.3, letterSpacing: -0.3 }}
+            >
+              プラン変更が完了しました
+            </div>
+            <div className="mt-1.5 text-[12px] font-bold text-dl-slate font-jp leading-[1.6]">
+              {targetLabel}でのご利用が始まりました。
+            </div>
+            <div className="mt-5 text-left">
+              <PushButton
+                color={DL.primary}
+                shadow={DL.primaryShadow}
+                fontSize={15}
+                height={54}
+                onClick={triggerClose}
+              >
+                完了
+              </PushButton>
+            </div>
+          </div>
+        )}
       </div>
-    </>
+    </div>
   );
 }
 

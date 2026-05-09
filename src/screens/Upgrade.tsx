@@ -132,50 +132,50 @@ export function UpgradeScreen() {
           </div>
         )}
 
-        {/* Billing toggle (free users only — paid users don't switch cadence here) */}
-        {!isPaid && (
-          <div className="px-5 pt-[14px]">
-            <div
-              className="rounded-full p-1 flex"
-              style={{ background: '#F5EDDF' }}
-            >
-              {(
-                [
-                  { id: 'monthly', label: '月額', save: null },
-                  { id: 'yearly', label: '年額', save: '2ヶ月分お得' },
-                ] as const
-              ).map((o) => {
-                const on = billing === o.id;
-                return (
-                  <div
-                    key={o.id}
-                    onClick={() => setBilling(o.id)}
-                    className="flex-1 h-[34px] rounded-full flex items-center justify-center gap-1.5 text-[12px] font-black font-jp cursor-pointer transition-all duration-150"
-                    style={{
-                      background: on ? '#fff' : 'transparent',
-                      boxShadow: on ? '0 2px 0 #E5DCC8, 0 1px 3px rgba(15,23,42,0.06)' : undefined,
-                      color: on ? DL.navy : DL.slateLight,
-                    }}
-                  >
-                    {o.label}
-                    {o.save && (
-                      <span
-                        className="text-[9px] font-black font-jp px-1.5 py-0.5 rounded-full"
-                        style={{
-                          letterSpacing: 0.3,
-                          background: on ? '#DCFCE7' : '#fff',
-                          color: DL.mintDark,
-                        }}
-                      >
-                        {o.save}
-                      </span>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+        {/* Billing toggle — always shown so paid users can also see the
+            yearly price for reference. (Cadence switch for paid users is
+            handled in the Stripe portal via "支払い方法 →".) */}
+        <div className="px-5 pt-[14px]">
+          <div
+            className="rounded-full p-1 flex"
+            style={{ background: '#F5EDDF' }}
+          >
+            {(
+              [
+                { id: 'monthly', label: '月額', save: null },
+                { id: 'yearly', label: '年額', save: '2ヶ月分お得' },
+              ] as const
+            ).map((o) => {
+              const on = billing === o.id;
+              return (
+                <div
+                  key={o.id}
+                  onClick={() => setBilling(o.id)}
+                  className="flex-1 h-[34px] rounded-full flex items-center justify-center gap-1.5 text-[12px] font-black font-jp cursor-pointer transition-all duration-150"
+                  style={{
+                    background: on ? '#fff' : 'transparent',
+                    boxShadow: on ? '0 2px 0 #E5DCC8, 0 1px 3px rgba(15,23,42,0.06)' : undefined,
+                    color: on ? DL.navy : DL.slateLight,
+                  }}
+                >
+                  {o.label}
+                  {o.save && (
+                    <span
+                      className="text-[9px] font-black font-jp px-1.5 py-0.5 rounded-full"
+                      style={{
+                        letterSpacing: 0.3,
+                        background: on ? '#DCFCE7' : '#fff',
+                        color: DL.mintDark,
+                      }}
+                    >
+                      {o.save}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
           </div>
-        )}
+        </div>
 
         {/* Premium hero card */}
         <div className="px-5 pt-[14px]">
@@ -216,8 +216,9 @@ export function UpgradeScreen() {
                 DailyLearn プレミアム
               </div>
 
-              {/* Price row — for paid users we still show the nominal price */}
-              {billing === 'monthly' || isPaid ? (
+              {/* Price row — toggles with the billing state for both free
+                  and paid users so the yearly price is always visible. */}
+              {billing === 'monthly' ? (
                 <div className="mt-2.5 flex items-baseline gap-1">
                   <div className="text-[13px] font-extrabold" style={{ color: '#FFD7B5' }}>
                     ¥

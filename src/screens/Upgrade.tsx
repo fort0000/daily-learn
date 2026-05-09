@@ -729,12 +729,12 @@ function CancelSheet({
   return (
     <div
       onClick={onClose}
-      className="absolute inset-0 flex items-end z-30"
+      className="absolute inset-0 flex items-end z-30 animate-dlbackdropfade"
       style={{ background: 'rgba(15,23,42,0.45)' }}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full bg-white px-5 pt-3.5 pb-[22px] font-jp"
+        className="w-full bg-white px-5 pt-3.5 pb-[22px] font-jp animate-dlsheetup"
         style={{
           borderRadius: '24px 24px 0 0',
           boxShadow: '0 -8px 32px rgba(15,23,42,0.18)',

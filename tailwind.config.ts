@@ -45,11 +45,21 @@ export default {
           from: { opacity: '0', transform: 'translateY(8px)' },
           to: { opacity: '1', transform: 'translateY(0)' },
         },
+        dlbackdropfade: {
+          from: { opacity: '0' },
+          to: { opacity: '1' },
+        },
+        dlsheetup: {
+          from: { transform: 'translateY(100%)' },
+          to: { transform: 'translateY(0)' },
+        },
       },
       animation: {
         dlblink: 'dlblink 1.2s infinite',
         dlpulse: 'dlpulse 2s infinite ease-out',
         dlfade: 'dlfade 240ms cubic-bezier(.2,.7,.3,1)',
+        dlbackdropfade: 'dlbackdropfade 200ms ease-out',
+        dlsheetup: 'dlsheetup 300ms cubic-bezier(.2,.7,.3,1)',
       },
     },
   },

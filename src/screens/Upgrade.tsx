@@ -539,8 +539,9 @@ export function UpgradeScreen() {
           periodEnd={profile?.subscription_period_end ?? null}
           onClose={() => setCancelOpen(false)}
           onConfirmed={(periodEnd, cancelAt) => {
-            // Optimistically reflect the new state in profile so the UI flips
-            // to "scheduled" immediately. The webhook will re-confirm.
+            // Push the new state up so /upgrade flips to "解約予定". The
+            // sheet keeps showing its own success view and closes itself
+            // after the user taps 完了.
             setProfile((p: Profile | null) =>
               p
                 ? {
@@ -550,7 +551,6 @@ export function UpgradeScreen() {
                   }
                 : p,
             );
-            setCancelOpen(false);
           }}
         />
       )}
@@ -694,6 +694,10 @@ function PaidStatusBox({
   );
 }
 
+// Animation duration for the sheet exit. Keep in sync with the dlsheetdown
+// keyframe in tailwind.config.ts.
+const SHEET_EXIT_MS = 280;
+
 function CancelSheet({
   periodEnd,
   onClose,
@@ -705,12 +709,27 @@ function CancelSheet({
 }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const dateStr = formatJpDate(periodEnd);
+  // Local view state. 'confirm' shows the retention copy; 'success' shows the
+  // post-cancel completion screen with a 完了 button.
+  const [view, setView] = useState<'confirm' | 'success'>('confirm');
+  // When true, we replay the slide-down + backdrop fade-out. The parent
+  // unmounts us via onClose() once the animation finishes.
+  const [closing, setClosing] = useState(false);
+  // Record the period_end the cancel API returned so the success copy still
+  // shows the right date even if the parent's profile state hasn't updated yet.
+  const [resolvedPeriodEnd, setResolvedPeriodEnd] = useState<string | null>(periodEnd);
+
   const losing = [
     'AIアシスタントが使えなくなります',
     'コースは1つまでに制限されます',
     'レッスンは10件まで受講可能になります',
   ];
+
+  const triggerClose = () => {
+    if (closing) return;
+    setClosing(true);
+    window.setTimeout(onClose, SHEET_EXIT_MS);
+  };
 
   const handleCancel = async () => {
     if (submitting) return;
@@ -718,23 +737,40 @@ function CancelSheet({
     setSubmitting(true);
     try {
       const { period_end, cancel_at } = await cancelSubscription();
+      // Push the new state up so the /upgrade page reflects "解約予定" right
+      // away — but keep the sheet open so we can show the success screen.
       onConfirmed(period_end, cancel_at);
+      setResolvedPeriodEnd(period_end);
+      setView('success');
     } catch (err) {
       console.error('[CancelSheet] cancellation failed:', err);
       setError(err instanceof Error ? err.message : '解約手続きに失敗しました');
+    } finally {
       setSubmitting(false);
     }
   };
 
+  const dateStr = formatJpDate(resolvedPeriodEnd);
+  // While closing we don't want a stray backdrop tap to re-trigger close.
+  const onBackdropClick = closing
+    ? undefined
+    : view === 'success'
+      ? triggerClose
+      : triggerClose;
+
   return (
     <div
-      onClick={onClose}
-      className="absolute inset-0 flex items-end z-30 animate-dlbackdropfade"
+      onClick={onBackdropClick}
+      className={`absolute inset-0 flex items-end z-30 ${
+        closing ? 'animate-dlbackdropfadeout' : 'animate-dlbackdropfade'
+      }`}
       style={{ background: 'rgba(15,23,42,0.45)' }}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full bg-white px-5 pt-3.5 pb-[22px] font-jp animate-dlsheetup"
+        className={`w-full bg-white px-5 pt-3.5 pb-[22px] font-jp ${
+          closing ? 'animate-dlsheetdown' : 'animate-dlsheetup'
+        }`}
         style={{
           borderRadius: '24px 24px 0 0',
           boxShadow: '0 -8px 32px rgba(15,23,42,0.18)',
@@ -744,100 +780,152 @@ function CancelSheet({
           className="mx-auto mb-3.5"
           style={{ width: 40, height: 4, borderRadius: 999, background: '#E5DCC8' }}
         />
-        <div
-          className="text-[18px] font-black text-dl-navy font-jp"
-          style={{ lineHeight: 1.3, letterSpacing: -0.3 }}
-        >
-          無料プランに戻りますか？
-        </div>
-        <div className="mt-1.5 text-[12px] font-bold text-dl-slate font-jp leading-[1.6]">
-          解約しても{' '}
-          <span className="text-dl-navy font-black">{dateStr ?? '次回更新日'}</span>{' '}
-          まではプレミアム特典をご利用いただけます。
-        </div>
 
-        <div
-          className="mt-3.5 px-3.5 py-3"
-          style={{
-            background: '#FFF7ED',
-            border: `1.5px solid #FED7AA`,
-            borderRadius: 16,
-          }}
-        >
-          <div
-            className="flex items-center gap-1.5 text-[11px] font-black font-jp"
-            style={{ color: DL.fireDark, letterSpacing: 0.5 }}
-          >
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-              <path
-                d="M6 1 L11 10 L1 10 Z"
-                stroke={DL.fireDark}
-                strokeWidth="1.6"
-                fill="none"
-                strokeLinejoin="round"
-              />
-              <path
-                d="M6 4.5 L6 7"
-                stroke={DL.fireDark}
-                strokeWidth="1.6"
-                strokeLinecap="round"
-              />
-              <circle cx="6" cy="8.5" r="0.7" fill={DL.fireDark} />
-            </svg>
-            失われる特典
-          </div>
-          <div className="mt-2 flex flex-col gap-1.5">
-            {losing.map((t) => (
-              <div key={t} className="flex items-start gap-2">
-                <div
-                  className="w-4 h-4 rounded-full flex items-center justify-center shrink-0 mt-px"
-                  style={{ background: '#FEE2E2' }}
-                >
-                  <svg width="7" height="7" viewBox="0 0 8 8">
-                    <path
-                      d="M2 2 L6 6 M6 2 L2 6"
-                      stroke="#DC2626"
-                      strokeWidth="1.8"
-                      strokeLinecap="round"
-                    />
-                  </svg>
-                </div>
-                <div className="text-[12px] font-bold text-dl-slate font-jp leading-[1.5]">
-                  {t}
-                </div>
+        {view === 'confirm' ? (
+          <>
+            <div
+              className="text-[18px] font-black text-dl-navy font-jp"
+              style={{ lineHeight: 1.3, letterSpacing: -0.3 }}
+            >
+              無料プランに戻りますか？
+            </div>
+            <div className="mt-1.5 text-[12px] font-bold text-dl-slate font-jp leading-[1.6]">
+              解約しても{' '}
+              <span className="text-dl-navy font-black">{dateStr ?? '次回更新日'}</span>{' '}
+              まではプレミアム特典をご利用いただけます。
+            </div>
+
+            <div
+              className="mt-3.5 px-3.5 py-3"
+              style={{
+                background: '#FFF7ED',
+                border: `1.5px solid #FED7AA`,
+                borderRadius: 16,
+              }}
+            >
+              <div
+                className="flex items-center gap-1.5 text-[11px] font-black font-jp"
+                style={{ color: DL.fireDark, letterSpacing: 0.5 }}
+              >
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                  <path
+                    d="M6 1 L11 10 L1 10 Z"
+                    stroke={DL.fireDark}
+                    strokeWidth="1.6"
+                    fill="none"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M6 4.5 L6 7"
+                    stroke={DL.fireDark}
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                  />
+                  <circle cx="6" cy="8.5" r="0.7" fill={DL.fireDark} />
+                </svg>
+                失われる特典
               </div>
-            ))}
-          </div>
-        </div>
+              <div className="mt-2 flex flex-col gap-1.5">
+                {losing.map((t) => (
+                  <div key={t} className="flex items-start gap-2">
+                    <div
+                      className="w-4 h-4 rounded-full flex items-center justify-center shrink-0 mt-px"
+                      style={{ background: '#FEE2E2' }}
+                    >
+                      <svg width="7" height="7" viewBox="0 0 8 8">
+                        <path
+                          d="M2 2 L6 6 M6 2 L2 6"
+                          stroke="#DC2626"
+                          strokeWidth="1.8"
+                          strokeLinecap="round"
+                        />
+                      </svg>
+                    </div>
+                    <div className="text-[12px] font-bold text-dl-slate font-jp leading-[1.5]">
+                      {t}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
 
-        {error && (
-          <div className="mt-3 px-3.5 py-2.5 rounded-2xl border-[1.5px] border-[#FCA5A5] bg-[#FEF2F2] text-[12px] font-bold text-[#B91C1C] font-jp leading-[1.5]">
-            {error}
+            {error && (
+              <div className="mt-3 px-3.5 py-2.5 rounded-2xl border-[1.5px] border-[#FCA5A5] bg-[#FEF2F2] text-[12px] font-bold text-[#B91C1C] font-jp leading-[1.5]">
+                {error}
+              </div>
+            )}
+
+            <div className="mt-4 flex flex-col gap-2.5">
+              <div className={submitting ? 'opacity-60 pointer-events-none' : ''}>
+                <PushButton
+                  color={DL.primary}
+                  shadow={DL.primaryShadow}
+                  fontSize={15}
+                  height={54}
+                  onClick={triggerClose}
+                >
+                  プレミアムを続ける
+                </PushButton>
+              </div>
+              <div
+                onClick={handleCancel}
+                className={`text-center text-[13px] font-extrabold py-2.5 cursor-pointer ${
+                  submitting ? 'opacity-50 pointer-events-none' : ''
+                }`}
+                style={{ color: '#DC2626' }}
+              >
+                {submitting ? '解約手続き中…' : '無料プランに戻す'}
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="pt-2 pb-1 text-center">
+            <div
+              className="mx-auto w-[64px] h-[64px] rounded-full flex items-center justify-center"
+              style={{
+                background: '#DCFCE7',
+                boxShadow: '0 4px 0 #BBF7D0',
+              }}
+            >
+              <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+                <path
+                  d="M8 16 L14 22 L24 10"
+                  stroke={DL.mintDark}
+                  strokeWidth="3.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </div>
+            <div
+              className="mt-4 text-[18px] font-black text-dl-navy font-jp"
+              style={{ lineHeight: 1.3, letterSpacing: -0.3 }}
+            >
+              解約手続きが完了しました
+            </div>
+            <div className="mt-1.5 text-[12px] font-bold text-dl-slate font-jp leading-[1.6]">
+              {dateStr ? (
+                <>
+                  <span className="text-dl-navy font-black">{dateStr}</span>{' '}
+                  までプレミアム特典をご利用いただけます。
+                </>
+              ) : (
+                '次回更新日までプレミアム特典をご利用いただけます。'
+              )}
+            </div>
+            <div className="mt-5 text-left">
+              <PushButton
+                color={DL.primary}
+                shadow={DL.primaryShadow}
+                fontSize={15}
+                height={54}
+                onClick={triggerClose}
+              >
+                完了
+              </PushButton>
+            </div>
           </div>
         )}
-
-        <div className="mt-4 flex flex-col gap-2.5">
-          <div className={submitting ? 'opacity-60 pointer-events-none' : ''}>
-            <PushButton
-              color={DL.primary}
-              shadow={DL.primaryShadow}
-              fontSize={15}
-              height={54}
-              onClick={onClose}
-            >
-              プレミアムを続ける
-            </PushButton>
-          </div>
-          <div
-            onClick={handleCancel}
-            className={`text-center text-[13px] font-extrabold py-2.5 cursor-pointer ${
-              submitting ? 'opacity-50 pointer-events-none' : ''
-            }`}
-            style={{ color: '#DC2626' }}
-          >
-            {submitting ? '解約手続き中…' : '無料プランに戻す'}
-          </div>
-        </div>
       </div>
     </div>
   );

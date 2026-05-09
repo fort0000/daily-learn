@@ -49,9 +49,17 @@ export default {
           from: { opacity: '0' },
           to: { opacity: '1' },
         },
+        dlbackdropfadeout: {
+          from: { opacity: '1' },
+          to: { opacity: '0' },
+        },
         dlsheetup: {
           from: { transform: 'translateY(100%)' },
           to: { transform: 'translateY(0)' },
+        },
+        dlsheetdown: {
+          from: { transform: 'translateY(0)' },
+          to: { transform: 'translateY(100%)' },
         },
       },
       animation: {
@@ -59,7 +67,9 @@ export default {
         dlpulse: 'dlpulse 2s infinite ease-out',
         dlfade: 'dlfade 240ms cubic-bezier(.2,.7,.3,1)',
         dlbackdropfade: 'dlbackdropfade 200ms ease-out',
+        dlbackdropfadeout: 'dlbackdropfadeout 240ms ease-out forwards',
         dlsheetup: 'dlsheetup 300ms cubic-bezier(.2,.7,.3,1)',
+        dlsheetdown: 'dlsheetdown 280ms cubic-bezier(.4,.0,.6,1) forwards',
       },
     },
   },

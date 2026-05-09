@@ -3,32 +3,39 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { DL } from '../lib/dl';
 import { Phone } from '../components/Phone';
 import { PushButton } from '../components/PushButton';
-import { useProfile, useSession } from '../lib/auth';
-import { startBillingCheckout, type BillingCadence } from '../lib/db';
+import { useProfile, useSession, type Profile } from '../lib/auth';
+import {
+  cancelSubscription,
+  startBillingCheckout,
+  startBillingPortal,
+  type BillingCadence,
+} from '../lib/db';
 
 export function UpgradeScreen() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const session = useSession();
   const userId = session.session?.user.id ?? null;
-  const { profile, refresh } = useProfile(userId);
+  const { profile, refresh, setProfile } = useProfile(userId);
 
   const [billing, setBilling] = useState<BillingCadence>('monthly');
   const [submitting, setSubmitting] = useState(false);
+  const [portalLoading, setPortalLoading] = useState(false);
+  const [cancelOpen, setCancelOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const status = searchParams.get('status');
-  const isAlreadyPaid = profile?.plan === 'paid';
+  const isPaid = profile?.plan === 'paid';
+  const isCancelScheduled = !!profile?.subscription_cancel_at;
 
-  // After Stripe Checkout succeeds the user lands here with ?status=success.
-  // The webhook usually flips profiles.plan before they arrive but allow ~12s
-  // of polling to cover the redirect→webhook race.
+  // After Stripe Checkout succeeds, poll the profile until the webhook flips
+  // plan to 'paid'. Stays on this screen — the layout itself swaps to the
+  // paid (07) variant once profile.plan === 'paid'.
   const pollRef = useRef<number | null>(null);
   useEffect(() => {
     if (status !== 'success') return;
-    if (isAlreadyPaid) {
+    if (isPaid) {
       setSearchParams({}, { replace: true });
-      navigate('/home', { replace: true });
       return;
     }
     let attempts = 0;
@@ -43,7 +50,7 @@ export function UpgradeScreen() {
     return () => {
       if (pollRef.current) window.clearInterval(pollRef.current);
     };
-  }, [status, isAlreadyPaid, refresh, setSearchParams, navigate]);
+  }, [status, isPaid, refresh, setSearchParams]);
 
   const handleUpgrade = async () => {
     if (submitting) return;
@@ -56,6 +63,20 @@ export function UpgradeScreen() {
       console.error('[Upgrade] checkout failed:', err);
       setError(err instanceof Error ? err.message : 'チェックアウトの開始に失敗しました');
       setSubmitting(false);
+    }
+  };
+
+  const handlePortal = async () => {
+    if (portalLoading) return;
+    setError(null);
+    setPortalLoading(true);
+    try {
+      const { url } = await startBillingPortal();
+      window.location.href = url;
+    } catch (err) {
+      console.error('[Upgrade] portal failed:', err);
+      setError(err instanceof Error ? err.message : 'ポータルの起動に失敗しました');
+      setPortalLoading(false);
     }
   };
 
@@ -95,15 +116,15 @@ export function UpgradeScreen() {
           </div>
         </div>
 
-        {/* Status banners */}
-        {status === 'cancel' && (
+        {/* Status banners (only shown for free users coming back from Stripe) */}
+        {status === 'cancel' && !isPaid && (
           <div className="px-5 mt-4">
             <div className="px-3.5 py-2.5 rounded-2xl border-[1.5px] border-[#FCA5A5] bg-[#FEF2F2] text-[12px] font-bold text-[#B91C1C] font-jp leading-[1.5]">
               支払いをキャンセルしました。いつでも再開できます。
             </div>
           </div>
         )}
-        {status === 'success' && !isAlreadyPaid && (
+        {status === 'success' && !isPaid && (
           <div className="px-5 mt-4">
             <div className="px-3.5 py-2.5 rounded-2xl border-[1.5px] border-[#FED7AA] bg-[#FFF7ED] text-[12px] font-bold text-[#9A3412] font-jp leading-[1.5]">
               支払いを確認中です…(数秒お待ちください)
@@ -111,48 +132,50 @@ export function UpgradeScreen() {
           </div>
         )}
 
-        {/* Billing toggle */}
-        <div className="px-5 pt-[14px]">
-          <div
-            className="rounded-full p-1 flex"
-            style={{ background: '#F5EDDF' }}
-          >
-            {(
-              [
-                { id: 'monthly', label: '月額', save: null },
-                { id: 'yearly', label: '年額', save: '2ヶ月分お得' },
-              ] as const
-            ).map((o) => {
-              const on = billing === o.id;
-              return (
-                <div
-                  key={o.id}
-                  onClick={() => setBilling(o.id)}
-                  className="flex-1 h-[34px] rounded-full flex items-center justify-center gap-1.5 text-[12px] font-black font-jp cursor-pointer transition-all duration-150"
-                  style={{
-                    background: on ? '#fff' : 'transparent',
-                    boxShadow: on ? '0 2px 0 #E5DCC8, 0 1px 3px rgba(15,23,42,0.06)' : undefined,
-                    color: on ? DL.navy : DL.slateLight,
-                  }}
-                >
-                  {o.label}
-                  {o.save && (
-                    <span
-                      className="text-[9px] font-black font-jp px-1.5 py-0.5 rounded-full"
-                      style={{
-                        letterSpacing: 0.3,
-                        background: on ? '#DCFCE7' : '#fff',
-                        color: DL.mintDark,
-                      }}
-                    >
-                      {o.save}
-                    </span>
-                  )}
-                </div>
-              );
-            })}
+        {/* Billing toggle (free users only — paid users don't switch cadence here) */}
+        {!isPaid && (
+          <div className="px-5 pt-[14px]">
+            <div
+              className="rounded-full p-1 flex"
+              style={{ background: '#F5EDDF' }}
+            >
+              {(
+                [
+                  { id: 'monthly', label: '月額', save: null },
+                  { id: 'yearly', label: '年額', save: '2ヶ月分お得' },
+                ] as const
+              ).map((o) => {
+                const on = billing === o.id;
+                return (
+                  <div
+                    key={o.id}
+                    onClick={() => setBilling(o.id)}
+                    className="flex-1 h-[34px] rounded-full flex items-center justify-center gap-1.5 text-[12px] font-black font-jp cursor-pointer transition-all duration-150"
+                    style={{
+                      background: on ? '#fff' : 'transparent',
+                      boxShadow: on ? '0 2px 0 #E5DCC8, 0 1px 3px rgba(15,23,42,0.06)' : undefined,
+                      color: on ? DL.navy : DL.slateLight,
+                    }}
+                  >
+                    {o.label}
+                    {o.save && (
+                      <span
+                        className="text-[9px] font-black font-jp px-1.5 py-0.5 rounded-full"
+                        style={{
+                          letterSpacing: 0.3,
+                          background: on ? '#DCFCE7' : '#fff',
+                          color: DL.mintDark,
+                        }}
+                      >
+                        {o.save}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Premium hero card */}
         <div className="px-5 pt-[14px]">
@@ -166,7 +189,6 @@ export function UpgradeScreen() {
               border: `2px solid ${DL.primary}`,
             }}
           >
-            {/* corner glow */}
             <div
               className="absolute pointer-events-none"
               style={{
@@ -194,8 +216,8 @@ export function UpgradeScreen() {
                 DailyLearn プレミアム
               </div>
 
-              {/* Price row */}
-              {billing === 'monthly' ? (
+              {/* Price row — for paid users we still show the nominal price */}
+              {billing === 'monthly' || isPaid ? (
                 <div className="mt-2.5 flex items-baseline gap-1">
                   <div className="text-[13px] font-extrabold" style={{ color: '#FFD7B5' }}>
                     ¥
@@ -339,30 +361,42 @@ export function UpgradeScreen() {
                 ))}
               </div>
 
-              {/* CTA */}
-              <div className={`mt-3.5 ${submitting ? 'opacity-60 pointer-events-none' : ''}`}>
-                <PushButton
-                  color={DL.primary}
-                  shadow={DL.primaryShadow}
-                  fontSize={15}
-                  height={54}
-                  onClick={handleUpgrade}
-                >
-                  {submitting
-                    ? '読み込み中…'
-                    : billing === 'monthly'
-                      ? 'プレミアムを始める →'
-                      : '年額プランで始める →'}
-                </PushButton>
-              </div>
-              <div
-                className="mt-2 text-center text-[10px] font-bold font-jp"
-                style={{ color: '#FFD7B5', opacity: 0.7 }}
-              >
-                {billing === 'monthly'
-                  ? 'いつでもキャンセル可能 · 自動更新'
-                  : '初年度 ¥9,800 · 翌年以降も同額で自動更新'}
-              </div>
+              {/* CTA — depends on plan state */}
+              {isPaid ? (
+                <PaidStatusBox
+                  profile={profile}
+                  isCancelScheduled={isCancelScheduled}
+                  loading={portalLoading}
+                  onPortal={handlePortal}
+                />
+              ) : (
+                <>
+                  <div className={`mt-3.5 ${submitting ? 'opacity-60 pointer-events-none' : ''}`}>
+                    <PushButton
+                      color={DL.primary}
+                      shadow={DL.primaryShadow}
+                      fontSize={15}
+                      height={54}
+                      onClick={handleUpgrade}
+                    >
+                      {submitting
+                        ? '読み込み中…'
+                        : billing === 'monthly'
+                          ? 'プレミアムを始める →'
+                          : '年額プランで始める →'}
+                    </PushButton>
+                  </div>
+                  <div
+                    className="mt-2 text-center text-[10px] font-bold font-jp"
+                    style={{ color: '#FFD7B5', opacity: 0.7 }}
+                  >
+                    {billing === 'monthly'
+                      ? 'いつでもキャンセル可能 · 自動更新'
+                      : '初年度 ¥9,800 · 翌年以降も同額で自動更新'}
+                  </div>
+                </>
+              )}
+
               {error && (
                 <div
                   className="mt-2 px-3 py-2 rounded-xl text-[11px] font-extrabold font-jp text-center"
@@ -398,7 +432,7 @@ export function UpgradeScreen() {
                   </div>
                 </div>
               </div>
-              {!isAlreadyPaid && (
+              {!isPaid && (
                 <div
                   className="text-[9px] font-black font-jp shrink-0"
                   style={{
@@ -419,16 +453,311 @@ export function UpgradeScreen() {
                 [
                   { ok: true, text: '1コースまで作成可能' },
                   { ok: true, text: '10レッスンまで受講可能' },
-                  { ok: false, text: 'AIアシスタント機能は使えません' },
+                  { ok: false, text: 'AIアシスタント機能利用不可' },
                 ] as const
               ).map((f) => (
                 <FeatureRow key={f.text} ok={f.ok} text={f.text} />
               ))}
             </div>
+
+            {/* Downgrade link — paid + not yet scheduled */}
+            {isPaid && !isCancelScheduled && (
+              <div
+                onClick={() => setCancelOpen(true)}
+                className="mt-3 pt-2.5 flex items-center justify-between cursor-pointer"
+                style={{ borderTop: `1px dashed ${DL.divider}` }}
+              >
+                <div>
+                  <div className="text-[12px] font-black text-dl-navy font-jp">
+                    無料プランに戻す
+                  </div>
+                  <div className="text-[10px] font-bold text-dl-slate-light font-jp mt-0.5">
+                    次回更新日まで特典は利用できます
+                  </div>
+                </div>
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                  <path
+                    d="M5 3 L9 7 L5 11"
+                    stroke={DL.slateLight}
+                    strokeWidth="2.2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </div>
+            )}
           </div>
         </div>
       </div>
+
+      {cancelOpen && (
+        <CancelSheet
+          periodEnd={profile?.subscription_period_end ?? null}
+          onClose={() => setCancelOpen(false)}
+          onConfirmed={(periodEnd, cancelAt) => {
+            // Optimistically reflect the new state in profile so the UI flips
+            // to "scheduled" immediately. The webhook will re-confirm.
+            setProfile((p: Profile | null) =>
+              p
+                ? {
+                    ...p,
+                    subscription_period_end: periodEnd,
+                    subscription_cancel_at: cancelAt,
+                  }
+                : p,
+            );
+            setCancelOpen(false);
+          }}
+        />
+      )}
     </Phone>
+  );
+}
+
+function PaidStatusBox({
+  profile,
+  isCancelScheduled,
+  loading,
+  onPortal,
+}: {
+  profile: Profile | null;
+  isCancelScheduled: boolean;
+  loading: boolean;
+  onPortal: () => void;
+}) {
+  const dateStr = formatJpDate(
+    isCancelScheduled
+      ? profile?.subscription_cancel_at
+      : profile?.subscription_period_end,
+  );
+  const labelText = isCancelScheduled ? '解約予定' : 'ご利用中';
+  const subText = isCancelScheduled
+    ? dateStr
+      ? `${dateStr} に終了`
+      : '次回更新日に終了'
+    : dateStr
+      ? `次回更新日 · ${dateStr}`
+      : 'プレミアムプラン';
+
+  return (
+    <div
+      className={`mt-3.5 flex items-center gap-2 ${loading ? 'opacity-60 pointer-events-none' : ''}`}
+      style={{
+        background: 'rgba(255,255,255,0.06)',
+        border: '1px solid rgba(255,215,181,0.22)',
+        borderRadius: 12,
+        padding: '10px 12px',
+      }}
+    >
+      <div
+        className="w-[22px] h-[22px] rounded-full flex items-center justify-center shrink-0"
+        style={{
+          background: isCancelScheduled
+            ? 'rgba(252,211,77,0.25)'
+            : 'rgba(34,197,94,0.25)',
+        }}
+      >
+        {isCancelScheduled ? (
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+            <path
+              d="M6 3 L6 7"
+              stroke="#FCD34D"
+              strokeWidth="2"
+              strokeLinecap="round"
+            />
+            <circle cx="6" cy="9" r="0.9" fill="#FCD34D" />
+          </svg>
+        ) : (
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+            <path
+              d="M2 6 L5 9 L10 3"
+              stroke="#86EFAC"
+              strokeWidth="2.2"
+              fill="none"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        )}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div
+          className="text-[11px] font-black font-jp"
+          style={{
+            letterSpacing: 0.5,
+            color: isCancelScheduled ? '#FCD34D' : '#86EFAC',
+          }}
+        >
+          {labelText}
+        </div>
+        <div
+          className="text-[11px] font-bold font-jp mt-px truncate"
+          style={{ color: '#FFD7B5' }}
+        >
+          {subText}
+        </div>
+      </div>
+      <div
+        onClick={onPortal}
+        className="text-[11px] font-black text-white font-jp cursor-pointer shrink-0"
+        style={{
+          background: 'rgba(255,255,255,0.08)',
+          padding: '6px 10px',
+          borderRadius: 999,
+        }}
+      >
+        {loading ? '...' : '支払い方法 →'}
+      </div>
+    </div>
+  );
+}
+
+function CancelSheet({
+  periodEnd,
+  onClose,
+  onConfirmed,
+}: {
+  periodEnd: string | null;
+  onClose: () => void;
+  onConfirmed: (periodEnd: string | null, cancelAt: string | null) => void;
+}) {
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const dateStr = formatJpDate(periodEnd);
+  const losing = [
+    'AIアシスタントが使えなくなります',
+    'コースは1つまでに制限されます',
+    'レッスンは10件まで受講可能になります',
+  ];
+
+  const handleCancel = async () => {
+    if (submitting) return;
+    setError(null);
+    setSubmitting(true);
+    try {
+      const { period_end, cancel_at } = await cancelSubscription();
+      onConfirmed(period_end, cancel_at);
+    } catch (err) {
+      console.error('[CancelSheet] cancellation failed:', err);
+      setError(err instanceof Error ? err.message : '解約手続きに失敗しました');
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div
+      onClick={onClose}
+      className="absolute inset-0 flex items-end z-30"
+      style={{ background: 'rgba(15,23,42,0.45)' }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-full bg-white px-5 pt-3.5 pb-[22px] font-jp"
+        style={{
+          borderRadius: '24px 24px 0 0',
+          boxShadow: '0 -8px 32px rgba(15,23,42,0.18)',
+        }}
+      >
+        <div
+          className="mx-auto mb-3.5"
+          style={{ width: 40, height: 4, borderRadius: 999, background: '#E5DCC8' }}
+        />
+        <div
+          className="text-[18px] font-black text-dl-navy font-jp"
+          style={{ lineHeight: 1.3, letterSpacing: -0.3 }}
+        >
+          無料プランに戻りますか？
+        </div>
+        <div className="mt-1.5 text-[12px] font-bold text-dl-slate font-jp leading-[1.6]">
+          解約しても{' '}
+          <span className="text-dl-navy font-black">{dateStr ?? '次回更新日'}</span>{' '}
+          まではプレミアム特典をご利用いただけます。
+        </div>
+
+        <div
+          className="mt-3.5 px-3.5 py-3"
+          style={{
+            background: '#FFF7ED',
+            border: `1.5px solid #FED7AA`,
+            borderRadius: 16,
+          }}
+        >
+          <div
+            className="flex items-center gap-1.5 text-[11px] font-black font-jp"
+            style={{ color: DL.fireDark, letterSpacing: 0.5 }}
+          >
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <path
+                d="M6 1 L11 10 L1 10 Z"
+                stroke={DL.fireDark}
+                strokeWidth="1.6"
+                fill="none"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M6 4.5 L6 7"
+                stroke={DL.fireDark}
+                strokeWidth="1.6"
+                strokeLinecap="round"
+              />
+              <circle cx="6" cy="8.5" r="0.7" fill={DL.fireDark} />
+            </svg>
+            失われる特典
+          </div>
+          <div className="mt-2 flex flex-col gap-1.5">
+            {losing.map((t) => (
+              <div key={t} className="flex items-start gap-2">
+                <div
+                  className="w-4 h-4 rounded-full flex items-center justify-center shrink-0 mt-px"
+                  style={{ background: '#FEE2E2' }}
+                >
+                  <svg width="7" height="7" viewBox="0 0 8 8">
+                    <path
+                      d="M2 2 L6 6 M6 2 L2 6"
+                      stroke="#DC2626"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                </div>
+                <div className="text-[12px] font-bold text-dl-slate font-jp leading-[1.5]">
+                  {t}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {error && (
+          <div className="mt-3 px-3.5 py-2.5 rounded-2xl border-[1.5px] border-[#FCA5A5] bg-[#FEF2F2] text-[12px] font-bold text-[#B91C1C] font-jp leading-[1.5]">
+            {error}
+          </div>
+        )}
+
+        <div className="mt-4 flex flex-col gap-2.5">
+          <div className={submitting ? 'opacity-60 pointer-events-none' : ''}>
+            <PushButton
+              color={DL.primary}
+              shadow={DL.primaryShadow}
+              fontSize={15}
+              height={54}
+              onClick={onClose}
+            >
+              プレミアムを続ける
+            </PushButton>
+          </div>
+          <div
+            onClick={handleCancel}
+            className={`text-center text-[13px] font-extrabold py-2.5 cursor-pointer ${
+              submitting ? 'opacity-50 pointer-events-none' : ''
+            }`}
+            style={{ color: '#DC2626' }}
+          >
+            {submitting ? '解約手続き中…' : '無料プランに戻す'}
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -473,4 +802,11 @@ function FeatureRow({ ok, text }: { ok: boolean; text: string }) {
       </div>
     </div>
   );
+}
+
+function formatJpDate(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
 }

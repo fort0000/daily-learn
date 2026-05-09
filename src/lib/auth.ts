@@ -6,6 +6,11 @@ export type Profile = {
   id: string;
   display_name: string;
   plan: 'free' | 'paid';
+  // Phase 7 follow-up: when paid, the next renewal date. When the user has
+  // scheduled a cancellation, subscription_cancel_at is non-null and equals
+  // (or is very close to) subscription_period_end.
+  subscription_period_end: string | null;
+  subscription_cancel_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -122,7 +127,9 @@ export function useProfile(userId: string | null) {
     setError(null);
     supabase
       .from('profiles')
-      .select('id, display_name, plan, created_at, updated_at')
+      .select(
+        'id, display_name, plan, subscription_period_end, subscription_cancel_at, created_at, updated_at',
+      )
       .eq('id', userId)
       .maybeSingle()
       .then(({ data, error }) => {

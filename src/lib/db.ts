@@ -341,6 +341,22 @@ export async function startBillingPortal(): Promise<{ url: string }> {
   return data;
 }
 
+// Phase 7 follow-up: schedules cancellation at the current period end. The
+// subscription stays active until period_end, then the webhook flips plan to
+// 'free'. Returns the resulting cancel_at / period_end so the UI can update
+// without waiting for the webhook round-trip.
+export async function cancelSubscription(): Promise<{
+  cancel_at: string | null;
+  period_end: string | null;
+}> {
+  const { data, error } = await supabase.functions.invoke<{
+    cancel_at: string | null;
+    period_end: string | null;
+  }>('billing-cancel', { body: {} });
+  if (error) throw error;
+  return { cancel_at: data?.cancel_at ?? null, period_end: data?.period_end ?? null };
+}
+
 export function subscribeToChatMessages(
   lessonId: string,
   onInsert: (msg: ChatMessage) => void,

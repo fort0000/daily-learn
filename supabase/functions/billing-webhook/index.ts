@@ -112,14 +112,26 @@ async function resolveUserId(
   return { userId: null, customerId: null };
 }
 
+function toIso(unixSeconds: number | undefined | null): string | null {
+  if (typeof unixSeconds !== "number" || !Number.isFinite(unixSeconds)) return null;
+  return new Date(unixSeconds * 1000).toISOString();
+}
+
 async function setPlan(
   admin: SupabaseClient,
   userId: string,
   plan: "free" | "paid",
   customerId: string | null,
+  periodEnd: string | null = null,
+  cancelAt: string | null = null,
 ): Promise<void> {
   const update: Record<string, string | null> = { plan };
   if (customerId) update.stripe_customer_id = customerId;
+  // Always overwrite period/cancel fields (passing null explicitly clears
+  // them), so a re-subscription clears a stale cancel_at and a delete clears
+  // the period_end.
+  update.subscription_period_end = periodEnd;
+  update.subscription_cancel_at = cancelAt;
   const { error } = await admin.from("profiles").update(update).eq("id", userId);
   if (error) throw error;
 }
@@ -174,7 +186,10 @@ Deno.serve(async (req: Request) => {
         console.warn("[billing-webhook] no user_id resolved for event", event.id);
         return ok();
       }
-      await setPlan(admin, userId, "paid", customerId);
+      // checkout.session doesn't expose period_end directly. The subsequent
+      // customer.subscription.created/updated event will fill it in; for now
+      // just flip plan and clear stale fields.
+      await setPlan(admin, userId, "paid", customerId, null, null);
     } else if (
       event.type === "customer.subscription.deleted" ||
       event.type === "customer.subscription.paused"
@@ -184,18 +199,25 @@ Deno.serve(async (req: Request) => {
         console.warn("[billing-webhook] no user_id resolved for event", event.id);
         return ok();
       }
-      await setPlan(admin, userId, "free", customerId);
-    } else if (event.type === "customer.subscription.updated") {
+      await setPlan(admin, userId, "free", customerId, null, null);
+    } else if (
+      event.type === "customer.subscription.updated" ||
+      event.type === "customer.subscription.created"
+    ) {
       // Handle reactivation / state flips. status: active|trialing → paid,
       // anything else (canceled, unpaid, past_due, incomplete_expired) → free.
       const status = obj.status as string | undefined;
+      const periodEnd = toIso(obj.current_period_end as number | undefined);
+      const cancelAt = (obj.cancel_at_period_end as boolean | undefined)
+        ? toIso(obj.cancel_at as number | undefined) ?? periodEnd
+        : null;
       const { userId, customerId } = await resolveUserId(admin, obj);
       if (!userId) {
         console.warn("[billing-webhook] no user_id for subscription.updated", event.id);
         return ok();
       }
       const plan = status === "active" || status === "trialing" ? "paid" : "free";
-      await setPlan(admin, userId, plan, customerId);
+      await setPlan(admin, userId, plan, customerId, periodEnd, cancelAt);
     } else {
       // Other events (invoice.*, customer.created, etc.) are recorded for
       // audit but no action taken.

@@ -184,3 +184,92 @@ export async function archiveCourse(courseId: string): Promise<void> {
     .eq('id', courseId);
   if (error) throw error;
 }
+
+// ----- Phase 5: lesson body generation + prefetch + chat -----
+
+// On-demand lesson body generation. Idempotent: if body is already non-null,
+// the Edge Function returns it without calling Anthropic.
+export async function requestLessonGeneration(lessonId: string): Promise<unknown> {
+  const { data, error } = await supabase.functions.invoke<{ body: unknown }>(
+    'lessons-generate',
+    { body: { lesson_id: lessonId } },
+  );
+  if (error) throw error;
+  if (!data?.body) throw new Error('lessons-generate returned no body');
+  return data.body;
+}
+
+// Fire-and-forget after markLessonComplete. The Edge Function checks the
+// frontier condition itself, so callers don't need to gate.
+export async function requestLessonPrefetchNext(lessonId: string): Promise<void> {
+  const { error } = await supabase.functions.invoke('lessons-prefetch-next', {
+    body: { lesson_id: lessonId },
+  });
+  if (error) {
+    // Best-effort: log but don't surface to the user. Realtime fallback handles it.
+    console.warn('[db] lessons-prefetch-next failed:', error);
+  }
+}
+
+export type ChatMessage = {
+  id: string;
+  lesson_id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  created_at: string;
+};
+
+const CHAT_COLS = 'id, lesson_id, role, content, created_at';
+
+export async function fetchChatMessages(lessonId: string): Promise<ChatMessage[]> {
+  const { data, error } = await supabase
+    .from('chat_messages')
+    .select(CHAT_COLS)
+    .eq('lesson_id', lessonId)
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as ChatMessage[];
+}
+
+// Send a message to chat-send. Returns both the user echo and assistant
+// reply, but the screen also subscribes to chat_messages via Realtime so
+// these usually arrive there first.
+export async function sendChatMessage(
+  lessonId: string,
+  content: string,
+): Promise<{ user: ChatMessage; assistant: ChatMessage }> {
+  const { data, error } = await supabase.functions.invoke<{
+    user: ChatMessage;
+    assistant: ChatMessage;
+  }>('chat-send', { body: { lesson_id: lessonId, content } });
+  if (error) throw error;
+  if (!data?.user || !data?.assistant) {
+    throw new Error('chat-send returned malformed response');
+  }
+  return data;
+}
+
+export function subscribeToChatMessages(
+  lessonId: string,
+  onInsert: (msg: ChatMessage) => void,
+): () => void {
+  const channel = supabase
+    .channel(`chat-${lessonId}`)
+    .on(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      'postgres_changes' as any,
+      {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'chat_messages',
+        filter: `lesson_id=eq.${lessonId}`,
+      },
+      (payload: { new: ChatMessage }) => {
+        onInsert(payload.new);
+      },
+    )
+    .subscribe();
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}

@@ -4,6 +4,11 @@
 
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { z } from "npm:zod@3";
+import {
+  generateLessonBody,
+  type CourseMeta,
+  type LessonBrief,
+} from "../_shared/lessonBody.ts";
 
 // EdgeRuntime is a Supabase-provided global; declare it so TS doesn't complain.
 declare const EdgeRuntime: { waitUntil: (p: Promise<unknown>) => void };
@@ -179,7 +184,10 @@ async function runBackground(
       title: l.title,
       summary: l.summary,
     }));
-    const { error: lessonsErr } = await admin.from("lessons").insert(lessonRows);
+    const { data: insertedLessons, error: lessonsErr } = await admin
+      .from("lessons")
+      .insert(lessonRows)
+      .select("id, day, title, summary");
     if (lessonsErr) throw lessonsErr;
 
     // Order matters: lessons must exist BEFORE we flip status to 'active', so
@@ -191,6 +199,11 @@ async function runBackground(
     if (updateErr) throw updateErr;
 
     console.log(`[courses-generate] course ${courseId} ready: ${skeleton.title}`);
+
+    // Pre-generate the Day 1 body so the user opens the article without a
+    // spinner. Best-effort: a failure here just leaves body=NULL and the
+    // Article screen falls back to lessons-generate on first open.
+    await prefillDay1(admin, courseId, skeleton.title, input, insertedLessons ?? []);
   } catch (err) {
     console.error(`[courses-generate] background failed for ${courseId}:`, err);
     const summary = err instanceof Error ? err.message : String(err);
@@ -199,6 +212,52 @@ async function runBackground(
       .from("courses")
       .update({ status: "failed", generation_error: trimmed })
       .eq("id", courseId);
+  }
+}
+
+async function prefillDay1(
+  admin: SupabaseClient,
+  courseId: string,
+  courseTitle: string,
+  input: GenerationInput,
+  inserted: Array<{ id: string; day: number; title: string; summary: string }>,
+): Promise<void> {
+  const day1 = inserted.find((l) => l.day === 1);
+  if (!day1) {
+    console.warn(`[courses-generate] no day=1 lesson for course ${courseId}; skipping prefill`);
+    return;
+  }
+  try {
+    const courseMeta: CourseMeta = {
+      field: input.field,
+      prerequisite: input.prerequisite || null,
+      goal: input.goal,
+      title: courseTitle,
+    };
+    const allLessons: LessonBrief[] = inserted.map((l) => ({
+      day: l.day,
+      title: l.title,
+      summary: l.summary,
+    }));
+    const body = await generateLessonBody(ANTHROPIC_API_KEY!, courseMeta, allLessons, {
+      day: day1.day,
+      title: day1.title,
+      summary: day1.summary,
+    });
+    const { error } = await admin
+      .from("lessons")
+      .update({
+        body,
+        generated_at: new Date().toISOString(),
+        prefetch_batch_id: null,
+      })
+      .eq("id", day1.id)
+      .is("body", null);
+    if (error) throw error;
+    console.log(`[courses-generate] day1 prefilled for course ${courseId}`);
+  } catch (err) {
+    // Swallow — the user can still open Day 1 and lessons-generate runs.
+    console.error(`[courses-generate] day1 prefill failed for course ${courseId}:`, err);
   }
 }
 

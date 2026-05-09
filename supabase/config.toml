@@ -380,6 +380,12 @@ deno_version = 2
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
 
+# prefetch-pull is invoked by pg_cron (no Supabase JWT). The cron job sends
+# the service_role key in the Authorization header instead — see migration
+# 20260509120100_lessons_prefetch.sql.
+[functions.prefetch-pull]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327

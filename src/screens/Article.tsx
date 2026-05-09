@@ -5,7 +5,15 @@ import { Phone } from '../components/Phone';
 import { StatusBar } from '../components/StatusBar';
 import { TabBar } from '../components/TabBar';
 import { PushButton } from '../components/PushButton';
-import { fetchLesson, markLessonComplete, type Lesson } from '../lib/db';
+import { LessonRenderer } from '../components/LessonRenderer';
+import {
+  fetchLesson,
+  markLessonComplete,
+  requestLessonGeneration,
+  requestLessonPrefetchNext,
+  type Lesson,
+} from '../lib/db';
+import { isLessonBody, type LessonBody } from '../lib/lessonBody';
 
 export function ArticleScreen() {
   const { route, navigate } = useNav();
@@ -13,6 +21,7 @@ export function ArticleScreen() {
 
   const [lesson, setLesson] = useState<Lesson | null>(null);
   const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
   const [completing, setCompleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -40,11 +49,39 @@ export function ArticleScreen() {
     };
   }, [lessonId]);
 
+  // If the lesson row exists but body is null, kick the Realtime generation
+  // path. The Edge Function persists body+generated_at; we update local state
+  // with the returned body so we don't need a second fetch.
+  useEffect(() => {
+    if (!lesson || lesson.body != null || generating) return;
+    let active = true;
+    setGenerating(true);
+    setError(null);
+    requestLessonGeneration(lesson.id)
+      .then((body) => {
+        if (!active) return;
+        setLesson((prev) => (prev ? { ...prev, body, generated_at: new Date().toISOString() } : prev));
+      })
+      .catch((e) => {
+        console.error('[Article] requestLessonGeneration failed:', e);
+        if (active) setError(e instanceof Error ? e.message : '本文の生成に失敗しました');
+      })
+      .finally(() => {
+        if (active) setGenerating(false);
+      });
+    return () => {
+      active = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lesson?.id, lesson?.body]);
+
   const handleComplete = async () => {
     if (!lesson || completing || lesson.completed_at) return;
     setCompleting(true);
     try {
       await markLessonComplete(lesson.id);
+      // Fire-and-forget — server-side checks frontier conditions itself.
+      void requestLessonPrefetchNext(lesson.id);
       navigate('home');
     } catch (e) {
       console.error('[Article] markLessonComplete failed:', e);
@@ -52,6 +89,8 @@ export function ArticleScreen() {
       setCompleting(false);
     }
   };
+
+  const body = lesson?.body && isLessonBody(lesson.body) ? (lesson.body as LessonBody) : null;
 
   return (
     <Phone bg="#FFFBF5">
@@ -94,7 +133,7 @@ export function ArticleScreen() {
         ) : !lesson ? (
           <NotFound onBack={() => navigate('home')} />
         ) : (
-          <ArticleBody lesson={lesson} />
+          <ArticleBody lesson={lesson} body={body} generating={generating} />
         )}
 
         {error && (
@@ -110,7 +149,7 @@ export function ArticleScreen() {
                 ✓ 完了済み — ホームへ
               </PushButton>
             ) : (
-              <div className={completing ? 'opacity-60 pointer-events-none' : ''}>
+              <div className={completing || generating ? 'opacity-60 pointer-events-none' : ''}>
                 <PushButton
                   color={DL.mint}
                   shadow={DL.mintShadow}
@@ -142,9 +181,15 @@ export function ArticleScreen() {
   );
 }
 
-function ArticleBody({ lesson }: { lesson: Lesson }) {
-  // body rendering is Phase 5; for Phase 3 we just surface title + summary so
-  // that completion flow can be exercised end-to-end.
+function ArticleBody({
+  lesson,
+  body,
+  generating,
+}: {
+  lesson: Lesson;
+  body: LessonBody | null;
+  generating: boolean;
+}) {
   return (
     <>
       <h1 className="text-2xl font-black text-dl-navy font-jp leading-[1.3] mt-2 mx-0 mb-2 tracking-[-0.3px]">
@@ -152,16 +197,45 @@ function ArticleBody({ lesson }: { lesson: Lesson }) {
       </h1>
       <div className="text-xs text-dl-slate font-jp mb-5">DAY {lesson.day} / 30 · 約10分</div>
 
-      <div className="bg-white rounded-[18px] px-4 py-3.5 border-[1.5px] border-dl-border mb-3.5">
-        <div className="text-[13px] font-black text-dl-navy font-jp mb-2">📝 概要</div>
-        <div className="text-[14px] leading-[1.7] text-dl-navy font-jp">{lesson.summary}</div>
-      </div>
-
-      {lesson.body == null && (
-        <div className="bg-[#FFF7ED] rounded-2xl px-3.5 py-3 border-[1.5px] border-[#FED7AA] text-[12px] font-bold text-dl-fire-dark font-jp leading-[1.6]">
-          本文は準備中です。読み終えたら下のボタンで完了を記録してください。
+      {body ? (
+        <LessonRenderer body={body} />
+      ) : generating ? (
+        <Generating summary={lesson.summary} />
+      ) : (
+        // Body load failed (e.g. non-LessonBody legacy JSON or generation
+        // error). Show summary so the user has something while we retry.
+        <div className="bg-white rounded-[18px] px-4 py-3.5 border-[1.5px] border-dl-border">
+          <div className="text-[13px] font-black text-dl-navy font-jp mb-2">📝 概要</div>
+          <div className="text-[14px] leading-[1.7] text-dl-navy font-jp">{lesson.summary}</div>
         </div>
       )}
+    </>
+  );
+}
+
+function Generating({ summary }: { summary: string }) {
+  return (
+    <>
+      <div className="bg-white rounded-[18px] px-4 py-3.5 border-[1.5px] border-dl-border mb-3.5">
+        <div className="text-[13px] font-black text-dl-navy font-jp mb-2">📝 概要</div>
+        <div className="text-[14px] leading-[1.7] text-dl-navy font-jp">{summary}</div>
+      </div>
+      <div className="bg-[#FFF7ED] rounded-2xl px-3.5 py-3 border-[1.5px] border-[#FED7AA] flex items-center gap-2.5">
+        <div className="flex gap-1">
+          <span className="w-[7px] h-[7px] rounded-full bg-dl-fire-dark animate-dlblink" />
+          <span
+            className="w-[7px] h-[7px] rounded-full bg-dl-fire-dark animate-dlblink"
+            style={{ animationDelay: '0.2s' }}
+          />
+          <span
+            className="w-[7px] h-[7px] rounded-full bg-dl-fire-dark animate-dlblink"
+            style={{ animationDelay: '0.4s' }}
+          />
+        </div>
+        <div className="text-[12px] font-extrabold text-dl-fire-dark font-jp leading-[1.5]">
+          本文を生成中…(約20〜30秒)
+        </div>
+      </div>
     </>
   );
 }

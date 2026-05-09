@@ -73,6 +73,30 @@ export function bucketCompletedByJstDate(
   return out;
 }
 
+/**
+ * Pacing rule: only one lesson per JST day. If the user already completed any
+ * lesson today, the next-in-sequence lesson is held until JST midnight rolls
+ * over.
+ *
+ * Returns the `day` number of the locked lesson, or null when nothing is
+ * locked. Operates on the lesson list of a single course.
+ */
+export function nextLockedDay(
+  lessons: { day: number; completed_at: string | null }[],
+): number | null {
+  if (lessons.length === 0) return null;
+  const completed = lessons.filter((l) => l.completed_at);
+  if (completed.length === 0) return null;
+  const today = jstDateString();
+  const anyToday = completed.some(
+    (l) => jstDateString(new Date(l.completed_at!)) === today,
+  );
+  if (!anyToday) return null;
+  const maxDay = Math.max(...completed.map((l) => l.day));
+  if (maxDay >= 30) return null;
+  return maxDay + 1;
+}
+
 /** Pretty header date — e.g. `5月7日(木)`. */
 export function formatJstHeaderDate(d: Date = new Date()): string {
   // Intl gives us the locale-correct format. We pin TZ to JST so this is stable.

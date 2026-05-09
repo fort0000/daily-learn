@@ -29,8 +29,8 @@
 | 1 | Vite + TypeScript + Tailwind 化 | ✅ done |
 | 2 | Supabase Auth + `profiles` | 🚧 雛形のみ(クライアント, 型, schema doc) |
 | 3 | `courses` + `lessons` スキーマ + 進捗表示 | ⏳ |
-| 4 | Edge Function `courses-generate`(コース一括生成) | ⏳ |
-| 5 | Edge Function `lessons-generate` + `chat-send`(本文 + AIアシスタント) | ⏳ |
+| 4 | Edge Function `courses-generate`(コース一括生成) | ✅ done |
+| 5 | Edge Function `lessons-generate` + `chat-send`(本文 + AIアシスタント) | ✅ done |
 | 6 | Stripe Checkout + Webhook で無料/有料プラン制御 | ⏳ |
 
 ---

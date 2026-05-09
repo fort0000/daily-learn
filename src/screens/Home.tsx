@@ -26,7 +26,7 @@ import {
   type Course,
   type Lesson,
 } from '../lib/db';
-import { bucketCompletedByJstDate, buildWeek, formatJstHeaderDate } from '../lib/week';
+import { bucketCompletedByJstDate, buildWeek, formatJstHeaderDate, nextLockedDay } from '../lib/week';
 
 type Palette = {
   color: string;
@@ -60,6 +60,9 @@ type CourseCard = {
   course: Course;
   // null when course is generating, failed, or has no remaining lessons.
   lesson: Lesson | null;
+  // True when `lesson.day` is held back by the daily-pacing rule (user already
+  // completed something today JST).
+  locked: boolean;
   palette: Palette;
 };
 
@@ -93,9 +96,11 @@ export function HomeScreen() {
         // useful to show — skip the card entirely. Generating/failed always
         // surface so the user can see progress / retry.
         if (course.status === 'active' && !next) return;
+        const lockedDay = nextLockedDay(lessons);
         built.push({
           course,
           lesson: next,
+          locked: !!next && lockedDay === next.day,
           palette: PALETTES[built.length % PALETTES.length]!,
         });
       });
@@ -404,7 +409,7 @@ function ActiveCard({
   wasDragging: () => boolean;
 }) {
   const { navigate } = useNav();
-  const { course, palette } = card;
+  const { course, palette, locked } = card;
 
   return (
     <CardShell palette={palette}>
@@ -425,18 +430,32 @@ function ActiveCard({
         {lesson.title}
       </div>
       <div className="mt-2 text-[13px] text-dl-slate leading-[1.6] font-jp">{lesson.summary}</div>
-      <div className="mt-[18px]">
-        <PushButton
-          color={palette.color}
-          shadow={palette.shadow}
-          fontSize={16}
-          onClick={() => {
-            if (!wasDragging()) navigate('article', { lessonId: lesson.id });
-          }}
-        >
-          今日の学びを始める →
-        </PushButton>
-      </div>
+      {locked ? (
+        <div className="mt-[18px] bg-[#FEF3C7] border-[1.5px] border-[#FCD34D] rounded-2xl px-3.5 py-3 flex items-center gap-2.5">
+          <div className="text-2xl shrink-0">🔒</div>
+          <div className="min-w-0">
+            <div className="text-[12px] font-black text-[#92400E] font-jp">
+              今日のレッスンは完了しました!
+            </div>
+            <div className="text-[11px] font-bold text-[#92400E] font-jp leading-[1.55] mt-0.5 opacity-90">
+              毎日コツコツ進めるのが大事。明日の朝にこの続きが解放されます。
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="mt-[18px]">
+          <PushButton
+            color={palette.color}
+            shadow={palette.shadow}
+            fontSize={16}
+            onClick={() => {
+              if (!wasDragging()) navigate('article', { lessonId: lesson.id });
+            }}
+          >
+            今日の学びを始める →
+          </PushButton>
+        </div>
+      )}
       <div
         onClick={() => {
           if (!wasDragging()) navigate('roadmap', { courseId: course.id });

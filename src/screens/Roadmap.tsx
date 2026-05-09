@@ -12,8 +12,9 @@ import {
   type Course,
   type Lesson,
 } from '../lib/db';
+import { nextLockedDay } from '../lib/week';
 
-type DayState = 'done' | 'current' | 'future';
+type DayState = 'done' | 'current' | 'locked' | 'future';
 
 type Cell = {
   day: number;
@@ -161,6 +162,8 @@ export function RoadmapScreen() {
 // Build 30 cells from the lesson rows. The "current" day is the lowest day
 // with completed_at IS NULL; everything before it is "done" (assumes lessons
 // progress in order, which the schema enforces via day=1..30 + UNIQUE).
+// If the user already completed something today (JST), the would-be "current"
+// day is held back as "locked" — daily pacing rule, see lib/week.ts.
 function buildCells(lessons: Lesson[] | null): Cell[] {
   if (lessons === null) {
     return Array.from({ length: 30 }, (_, i) => ({
@@ -172,12 +175,13 @@ function buildCells(lessons: Lesson[] | null): Cell[] {
   const byDay = new Map<number, Lesson>();
   for (const l of lessons) byDay.set(l.day, l);
   const firstUncompleted = lessons.find((l) => l.completed_at == null)?.day ?? null;
+  const lockedDay = nextLockedDay(lessons);
   return Array.from({ length: 30 }, (_, i) => {
     const day = i + 1;
     const lesson = byDay.get(day) ?? null;
     let state: DayState = 'future';
     if (lesson?.completed_at) state = 'done';
-    else if (firstUncompleted === day) state = 'current';
+    else if (firstUncompleted === day) state = lockedDay === day ? 'locked' : 'current';
     return { day, state, lesson };
   });
 }
@@ -240,11 +244,13 @@ function Node({ cell, idx, pulse }: NodeProps) {
   const colors: Record<DayState, { bg: string; sh: string; icon: 'check' | 'star' | 'lock' }> = {
     done: { bg: DL.mint, sh: '#0F7A38', icon: 'check' },
     current: { bg: DL.primary, sh: DL.primaryShadow, icon: 'star' },
+    // 'locked' = today's lesson already done; next day held until JST midnight.
+    locked: { bg: '#F5C36A', sh: '#A87014', icon: 'lock' },
     future: { bg: '#E5DCC8', sh: '#C9BFA8', icon: 'lock' },
   };
   const c = colors[state];
   const size = state === 'current' ? 56 : 44;
-  const navigable = state !== 'future' && lesson !== null;
+  const navigable = state !== 'future' && state !== 'locked' && lesson !== null;
 
   // Put the text block on the side opposite to where the node sits, so the
   // snake's empty side carries the lesson info.
@@ -258,6 +264,8 @@ function Node({ cell, idx, pulse }: NodeProps) {
     state === 'done'
       ? 'text-dl-slate'
       : state === 'current'
+      ? 'text-dl-navy'
+      : state === 'locked'
       ? 'text-dl-navy'
       : 'text-dl-slate-light';
 
@@ -281,6 +289,13 @@ function Node({ cell, idx, pulse }: NodeProps) {
           >
             {lesson.title}
           </div>
+          {state === 'locked' && (
+            <div
+              className="mt-1 inline-block text-[10px] font-extrabold font-jp px-1.5 py-px rounded-md bg-[#FEF3C7] text-[#92400E]"
+            >
+              🔒 明日解放
+            </div>
+          )}
         </div>
       ) : (
         <div className="absolute top-2" style={textStyle}>

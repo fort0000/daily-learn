@@ -135,12 +135,19 @@ Deno.serve(async (req: Request) => {
     return jsonError(409, "already_on_cadence", "Subscription already uses the requested cadence");
   }
 
-  // Swap the price item with proration so the user pays / gets credited
-  // immediately for the cadence change.
+  // Swap the price item with immediate proration billing.
+  // - proration_behavior=always_invoice: Stripe issues an invoice right away
+  //   containing (credit for unused old-plan time) + (new-plan period charge),
+  //   so the card is charged at the moment the user taps the upgrade CTA
+  //   instead of waiting for the next anchor.
+  // - billing_cycle_anchor=now: resets the billing anchor to "now" so the new
+  //   yearly cycle starts fresh today rather than continuing on the legacy
+  //   monthly anchor.
   const updateRes = await stripePost(`/subscriptions/${sub.id}`, {
     "items[0][id]": item.id,
     "items[0][price]": targetPriceId,
-    proration_behavior: "create_prorations",
+    proration_behavior: "always_invoice",
+    billing_cycle_anchor: "now",
     "metadata[billing]": target,
     // Clear any pending cancellation when switching to a different plan.
     cancel_at_period_end: "false",

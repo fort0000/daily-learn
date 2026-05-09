@@ -1,6 +1,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { DL } from '../lib/dl';
+import { useProfile, useSession } from '../lib/auth';
 import { Phone } from '../components/Phone';
 import { StatusBar } from '../components/StatusBar';
 import { TabBar } from '../components/TabBar';
@@ -239,7 +240,11 @@ const PATH_CENTER_X = 180; // approx phone-content midline
 
 function Node({ cell, idx, pulse }: NodeProps) {
   const navigate = useNavigate();
+  const session = useSession();
+  const userId = session.session?.user.id ?? null;
+  const { profile } = useProfile(userId);
   const { day, state, lesson } = cell;
+  const isPlanGated = profile?.plan === 'free' && day > 10;
   const left = PATH_POSITIONS[idx % PATH_POSITIONS.length]!;
 
   const colors: Record<DayState, { bg: string; sh: string; icon: 'check' | 'star' | 'lock' }> = {
@@ -270,12 +275,22 @@ function Node({ cell, idx, pulse }: NodeProps) {
       ? 'text-dl-navy'
       : 'text-dl-slate-light';
 
+  // Free plan: tapping any cell from Day 11 onward (regardless of lock state)
+  // routes to /upgrade. The cell visuals stay identical to the non-gated state
+  // per spec — only the destination changes.
+  const tapClickable = isPlanGated || navigable;
+  const onTap = () => {
+    if (isPlanGated) {
+      navigate('/upgrade', { replace: true });
+      return;
+    }
+    if (navigable && lesson) navigate(`/lessons/${lesson.id}`);
+  };
+
   return (
     <div
-      onClick={() => {
-        if (navigable && lesson) navigate(`/lessons/${lesson.id}`);
-      }}
-      className={`relative h-[72px] ${navigable ? 'cursor-pointer' : 'cursor-not-allowed'}`}
+      onClick={onTap}
+      className={`relative h-[72px] ${tapClickable ? 'cursor-pointer' : 'cursor-not-allowed'}`}
     >
       {/* Lesson title block on the opposite side of the node */}
       {lesson ? (

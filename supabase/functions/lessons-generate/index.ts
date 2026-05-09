@@ -54,27 +54,33 @@ type CourseRow = {
   title: string;
 };
 
-// Resolve { course, allLessons, target } from a single lesson_id, using the
-// caller-scoped client so RLS handles ownership for free.
+// Resolve { course, allLessons, target } from a single lesson_id. We need the
+// admin client here because the body column is REVOKE'd from the authenticated
+// role (Phase 7). Ownership is enforced by joining lessons → courses → user_id
+// and matching against the verified caller.
 async function loadContext(
-  client: SupabaseClient,
+  admin: SupabaseClient,
   lessonId: string,
+  userId: string,
 ): Promise<{ course: CourseMeta; allLessons: LessonBrief[]; target: LessonRow }> {
-  const { data: target, error: targetErr } = await client
+  const { data: target, error: targetErr } = await admin
     .from("lessons")
-    .select("id, course_id, day, title, summary, body")
+    .select("id, course_id, day, title, summary, body, course:courses!inner(user_id)")
     .eq("id", lessonId)
     .maybeSingle();
   if (targetErr) throw targetErr;
   if (!target) throw new Error("lesson_not_found");
+  if ((target as { course: { user_id: string } }).course.user_id !== userId) {
+    throw new Error("lesson_not_found");
+  }
 
   const [courseRes, lessonsRes] = await Promise.all([
-    client
+    admin
       .from("courses")
       .select("id, field, prerequisite, goal, title")
       .eq("id", (target as LessonRow).course_id)
       .maybeSingle(),
-    client
+    admin
       .from("lessons")
       .select("day, title, summary")
       .eq("course_id", (target as LessonRow).course_id)
@@ -124,9 +130,13 @@ Deno.serve(async (req: Request) => {
     return jsonError(401, "unauthorized", userErr?.message ?? "Invalid session");
   }
 
+  const admin = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!, {
+    auth: { persistSession: false },
+  });
+
   let ctx: Awaited<ReturnType<typeof loadContext>>;
   try {
-    ctx = await loadContext(userClient, lessonId);
+    ctx = await loadContext(admin, lessonId, user.id);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     if (msg === "lesson_not_found" || msg === "course_not_found") {
@@ -134,6 +144,18 @@ Deno.serve(async (req: Request) => {
     }
     console.error("[lessons-generate] loadContext failed:", err);
     return jsonError(500, "db_error", msg);
+  }
+
+  // Plan gate: free plan = Day 1〜10 only. Applied even when body already
+  // exists (re-access after downgrade still gets blocked).
+  const { data: profile } = await admin
+    .from("profiles")
+    .select("plan")
+    .eq("id", user.id)
+    .maybeSingle();
+  const plan = (profile as { plan: "free" | "paid" } | null)?.plan ?? "free";
+  if (plan === "free" && ctx.target.day > 10) {
+    return jsonError(402, "PLAN_LIMIT_LESSONS", "有料プランで Day 11 以降が解放されます");
   }
 
   // Already generated — return as-is. The Batch path UPDATEs with WHERE body
@@ -161,9 +183,6 @@ Deno.serve(async (req: Request) => {
 
   // Race protection: WHERE body IS NULL ensures a Batch result that landed
   // moments earlier wins, and we don't double-write.
-  const admin = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!, {
-    auth: { persistSession: false },
-  });
   const { error: updateErr } = await admin
     .from("lessons")
     .update({

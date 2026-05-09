@@ -7,18 +7,24 @@ import { TabBar } from '../components/TabBar';
 import { PushButton } from '../components/PushButton';
 import { LessonRenderer } from '../components/LessonRenderer';
 import {
+  PlanLimitError,
   fetchLesson,
   markLessonComplete,
   requestLessonGeneration,
   requestLessonPrefetchNext,
+  requestLessonRead,
   type Lesson,
 } from '../lib/db';
 import { isLessonBody, type LessonBody } from '../lib/lessonBody';
+import { useProfile, useSession } from '../lib/auth';
 
 export function ArticleScreen() {
   const navigate = useNavigate();
   const params = useParams();
   const lessonId = params.lessonId ?? null;
+  const session = useSession();
+  const userId = session.session?.user.id ?? null;
+  const { profile } = useProfile(userId);
 
   const [lesson, setLesson] = useState<Lesson | null>(null);
   const [loading, setLoading] = useState(true);
@@ -50,22 +56,54 @@ export function ArticleScreen() {
     };
   }, [lessonId]);
 
-  // If the lesson row exists but body is null, kick the Realtime generation
-  // path. The Edge Function persists body+generated_at; we update local state
-  // with the returned body so we don't need a second fetch.
+  // Plan gate: free + day > 10 → bounce to /upgrade. Skip until both lesson
+  // and profile are loaded so we don't flash the gate before we know the plan.
+  useEffect(() => {
+    if (!lesson || !profile) return;
+    if (profile.plan === 'free' && lesson.day > 10) {
+      navigate('/upgrade', { replace: true });
+    }
+  }, [lesson, profile, navigate]);
+
+  // Load body via the gated Edge Function (the body column is REVOKE'd from
+  // authenticated, so direct SELECT can't return it). lessons-read is a fast
+  // path when the row already has body; lessons-generate produces it on the
+  // first open.
   useEffect(() => {
     if (!lesson || lesson.body != null || generating) return;
+    if (profile?.plan === 'free' && lesson.day > 10) return; // gate redirect handles this
     let active = true;
     setGenerating(true);
     setError(null);
-    requestLessonGeneration(lesson.id)
-      .then((body) => {
+
+    const handlePlanLimit = (e: PlanLimitError) => {
+      if (e.code === 'PLAN_LIMIT_LESSONS') {
+        navigate('/upgrade', { replace: true });
+      } else {
+        setError(e.message);
+      }
+    };
+
+    // Try the read-only path first; fall back to generation only if body is
+    // genuinely missing (lessons-read returns body=null in that case).
+    requestLessonRead(lesson.id)
+      .then(async (body) => {
         if (!active) return;
-        setLesson((prev) => (prev ? { ...prev, body, generated_at: new Date().toISOString() } : prev));
+        if (body !== null) {
+          setLesson((prev) => (prev ? { ...prev, body } : prev));
+          return;
+        }
+        // body is null in the DB — kick generation.
+        const generated = await requestLessonGeneration(lesson.id);
+        if (!active) return;
+        setLesson((prev) =>
+          prev ? { ...prev, body: generated, generated_at: new Date().toISOString() } : prev,
+        );
       })
       .catch((e) => {
-        console.error('[Article] requestLessonGeneration failed:', e);
-        if (active) setError(e instanceof Error ? e.message : '本文の生成に失敗しました');
+        if (e instanceof PlanLimitError) return handlePlanLimit(e);
+        console.error('[Article] body fetch/generate failed:', e);
+        if (active) setError(e instanceof Error ? e.message : '本文の取得に失敗しました');
       })
       .finally(() => {
         if (active) setGenerating(false);
@@ -74,7 +112,7 @@ export function ArticleScreen() {
       active = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lesson?.id, lesson?.body]);
+  }, [lesson?.id, lesson?.body, profile?.plan]);
 
   const handleComplete = async () => {
     if (!lesson || completing || lesson.completed_at) return;

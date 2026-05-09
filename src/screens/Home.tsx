@@ -10,6 +10,7 @@ import {
 } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DL } from '../lib/dl';
+import { useProfile, useSession } from '../lib/auth';
 import { Phone } from '../components/Phone';
 import { StatusBar } from '../components/StatusBar';
 import { TabBar } from '../components/TabBar';
@@ -67,6 +68,9 @@ type CourseCard = {
 };
 
 export function HomeScreen() {
+  const session = useSession();
+  const userId = session.session?.user.id ?? null;
+  const { profile } = useProfile(userId);
   const [cards, setCards] = useState<CourseCard[] | null>(null);
   const [streak, setStreak] = useState({ current: 0, longest: 0 });
   const [completedSet, setCompletedSet] = useState<Set<string>>(() => new Set());
@@ -201,18 +205,22 @@ export function HomeScreen() {
         </div>
       </div>
 
-      <NewCourseCTA />
+      <NewCourseCTA
+        targetPath={
+          profile?.plan === 'free' && (cards?.length ?? 0) >= 1 ? '/upgrade' : '/create'
+        }
+      />
       <TabBar active="home" />
     </Phone>
   );
 }
 
-function NewCourseCTA() {
+function NewCourseCTA({ targetPath }: { targetPath: string }) {
   const navigate = useNavigate();
   return (
     <div className="pt-3.5 px-5">
       <button
-        onClick={() => navigate('/create')}
+        onClick={() => navigate(targetPath)}
         className="w-full bg-white border-2 border-dashed border-dl-primary rounded-[20px] px-4 py-3.5 flex items-center gap-3 cursor-pointer font-jp text-left"
       >
         <div className="w-11 h-11 rounded-[14px] bg-dl-primary flex items-center justify-center shadow-[0_3px_0_#C8431A] shrink-0">
@@ -409,7 +417,12 @@ function ActiveCard({
   wasDragging: () => boolean;
 }) {
   const navigate = useNavigate();
+  const session = useSession();
+  const userId = session.session?.user.id ?? null;
+  const { profile } = useProfile(userId);
   const { course, palette, locked } = card;
+  const isPlanGated = profile?.plan === 'free' && lesson.day > 10;
+  const lessonHref = isPlanGated ? '/upgrade' : `/lessons/${lesson.id}`;
 
   return (
     <CardShell palette={palette}>
@@ -449,7 +462,7 @@ function ActiveCard({
             shadow={palette.shadow}
             fontSize={16}
             onClick={() => {
-              if (!wasDragging()) navigate(`/lessons/${lesson.id}`);
+              if (!wasDragging()) navigate(lessonHref);
             }}
           >
             今日の学びを始める →

@@ -310,6 +310,25 @@ Deno.serve(async (req: Request) => {
     auth: { persistSession: false },
   });
 
+  // Plan gate: free plan = at most 1 non-archived course. Stops Stripe-bypass
+  // attacks where the client patches around the UI guard.
+  const { data: profile } = await admin
+    .from("profiles")
+    .select("plan")
+    .eq("id", user.id)
+    .maybeSingle();
+  const plan = (profile as { plan: "free" | "paid" } | null)?.plan ?? "free";
+  if (plan === "free") {
+    const { count } = await admin
+      .from("courses")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .in("status", ["generating", "active", "completed", "failed"]);
+    if ((count ?? 0) >= 1) {
+      return jsonError(402, "PLAN_LIMIT_COURSES", "無料プランは 1 コースまでです");
+    }
+  }
+
   // Insert the placeholder row immediately. The frontend renders the "作成中…"
   // card off this row (initial fetch + Realtime), so we want it visible before
   // the Claude call even starts.

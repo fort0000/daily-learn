@@ -1,22 +1,42 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DL } from '../lib/dl';
 import { Phone } from '../components/Phone';
 import { StatusBar } from '../components/StatusBar';
 import { TabBar } from '../components/TabBar';
 import { PushButton } from '../components/PushButton';
-import { startCourseGeneration } from '../lib/db';
+import { PlanLimitError, fetchActiveCourses, startCourseGeneration } from '../lib/db';
+import { useProfile, useSession } from '../lib/auth';
 
 const inputClass =
   'w-full box-border bg-white border-[1.5px] border-dl-border rounded-2xl px-3.5 py-3 text-sm font-bold text-dl-navy font-jp outline-none';
 
 export function CreateScreen() {
   const navigate = useNavigate();
+  const session = useSession();
+  const userId = session.session?.user.id ?? null;
+  const { profile } = useProfile(userId);
   const [field, setField] = useState('');
   const [prerequisite, setPrerequisite] = useState('');
   const [goal, setGoal] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Mount-time guard: deep-linking /create as a free user with an existing
+  // course should not show this form. Bounce to /upgrade instead.
+  useEffect(() => {
+    if (!profile || profile.plan !== 'free') return;
+    let active = true;
+    fetchActiveCourses()
+      .then((courses) => {
+        if (!active) return;
+        if (courses.length >= 1) navigate('/upgrade', { replace: true });
+      })
+      .catch((e) => console.error('[Create] guard fetch failed:', e));
+    return () => {
+      active = false;
+    };
+  }, [profile?.plan, navigate]);
 
   const canSubmit =
     !submitting && field.trim().length > 0 && goal.trim().length > 0;
@@ -36,6 +56,10 @@ export function CreateScreen() {
       // background generation finishes.
       navigate('/home');
     } catch (e) {
+      if (e instanceof PlanLimitError) {
+        navigate('/upgrade', { replace: true });
+        return;
+      }
       console.error('[Create] startCourseGeneration failed:', e);
       setError(e instanceof Error ? e.message : 'コースの作成リクエストに失敗しました');
       setSubmitting(false);

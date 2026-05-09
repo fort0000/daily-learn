@@ -18,6 +18,7 @@ import { AccountScreen } from './screens/Account';
 import { CreateScreen } from './screens/Create';
 import { LoginScreen } from './screens/Login';
 import { AuthCallbackScreen } from './screens/AuthCallback';
+import { UpgradeScreen } from './screens/Upgrade';
 
 export function App() {
   return (
@@ -34,6 +35,7 @@ export function App() {
           <Route path="/create" element={<CreateScreen />} />
           <Route path="/profile" element={<ProfileScreen />} />
           <Route path="/profile/account" element={<AccountScreen />} />
+          <Route path="/upgrade" element={<UpgradeScreen />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

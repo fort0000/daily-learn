@@ -11,11 +11,16 @@ import {
   subscribeToChatMessages,
   type ChatMessage,
 } from '../lib/db';
+import { useProfile, useSession } from '../lib/auth';
 
 export function ChatScreen() {
   const navigate = useNavigate();
   const params = useParams();
   const lessonId = params.lessonId ?? null;
+  const session = useSession();
+  const userId = session.session?.user.id ?? null;
+  const { profile } = useProfile(userId);
+  const isFree = profile?.plan === 'free';
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState('');
@@ -95,7 +100,7 @@ export function ChatScreen() {
     }
   };
 
-  const canSend = !!lessonId && !sending && draft.trim().length > 0;
+  const canSend = !!lessonId && !sending && !isFree && draft.trim().length > 0;
 
   return (
     <Phone bg="#FFFBF5">
@@ -164,13 +169,18 @@ export function ChatScreen() {
       </div>
 
       <div className="absolute bottom-4 left-0 right-0 px-3.5 pb-2.5">
+        {isFree && (
+          <div className="mb-2 px-3.5 py-2 rounded-2xl bg-[#FEF3C7] border-[1.5px] border-[#FCD34D] text-[11px] font-extrabold text-[#92400E] font-jp leading-[1.5] text-center">
+            AIアシスタントは有料プランで使えます
+          </div>
+        )}
         <div className="bg-white rounded-full border-[1.5px] border-dl-border pl-[18px] pr-1.5 py-1.5 flex items-center gap-2 shadow-[0_2px_0_#F0E2CD]">
           <input
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={onKeyDown}
-            placeholder={sending ? '送信中…' : 'メッセージを入力...'}
-            disabled={!lessonId || sending}
+            placeholder={isFree ? '有料プランで使えます' : sending ? '送信中…' : 'メッセージを入力...'}
+            disabled={!lessonId || sending || isFree}
             className="flex-1 text-[13px] text-dl-navy font-jp font-semibold outline-none bg-transparent placeholder:text-dl-slate-light"
           />
           <div

@@ -109,6 +109,8 @@ export function useProfile(userId: string | null) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Bumped to retrigger the fetch from outside (e.g. polling after Stripe).
+  const [reloadTick, setReloadTick] = useState(0);
 
   useEffect(() => {
     if (!userId) {
@@ -135,9 +137,10 @@ export function useProfile(userId: string | null) {
     return () => {
       active = false;
     };
-  }, [userId]);
+  }, [userId, reloadTick]);
 
-  return { profile, loading, error, setProfile };
+  const refresh = () => setReloadTick((n) => n + 1);
+  return { profile, loading, error, setProfile, refresh };
 }
 
 /**

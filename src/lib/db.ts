@@ -31,8 +31,11 @@ export type Streak = { current: number; longest: number };
 
 const COURSE_COLS =
   'id, user_id, field, prerequisite, goal, title, status, generation_error, started_at, created_at';
+// `body` is intentionally omitted — REVOKE'd from authenticated in Phase 7.
+// Read body via requestLessonRead / requestLessonGeneration instead, both of
+// which apply the plan gate before returning content.
 const LESSON_COLS =
-  'id, course_id, day, title, summary, body, generated_at, completed_at, created_at';
+  'id, course_id, day, title, summary, generated_at, completed_at, created_at';
 
 // Active courses = anything not archived. Generating and failed rows are
 // surfaced too so the Home carousel can render their dedicated states (作成中… /
@@ -142,7 +145,10 @@ export async function startCourseGeneration(
     'courses-generate',
     { body: input },
   );
-  if (error) throw error;
+  if (error) {
+    await throwIfPlanLimit(error);
+    throw error;
+  }
   if (!data?.course_id) throw new Error('courses-generate returned no course_id');
   return data;
 }
@@ -187,6 +193,45 @@ export async function archiveCourse(courseId: string): Promise<void> {
 
 // ----- Phase 5: lesson body generation + prefetch + chat -----
 
+// Phase 7: structured error returned by gated Edge Functions. The frontend
+// uses `code` to decide between an inline notice and a redirect to /upgrade.
+export class PlanLimitError extends Error {
+  constructor(
+    public readonly code: 'PLAN_LIMIT_LESSONS' | 'PLAN_LIMIT_COURSES' | 'PLAN_LIMIT_CHAT',
+    message: string,
+  ) {
+    super(message);
+    this.name = 'PlanLimitError';
+  }
+}
+
+type EdgeError = { code?: string; message?: string };
+
+// supabase-js wraps non-2xx into a FunctionsHttpError but doesn't expose the
+// JSON body directly. Reach into the underlying Response to extract our
+// `{ error: { code, message } }` envelope so callers can dispatch on `code`.
+async function readEdgeError(err: unknown): Promise<EdgeError | null> {
+  const ctx = (err as { context?: Response | { json?: () => Promise<unknown> } }).context;
+  if (!ctx) return null;
+  try {
+    const body = (await (ctx as Response).json?.()) as { error?: EdgeError } | undefined;
+    return body?.error ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function throwIfPlanLimit(err: unknown): Promise<void> {
+  const parsed = await readEdgeError(err);
+  if (
+    parsed?.code === 'PLAN_LIMIT_LESSONS' ||
+    parsed?.code === 'PLAN_LIMIT_COURSES' ||
+    parsed?.code === 'PLAN_LIMIT_CHAT'
+  ) {
+    throw new PlanLimitError(parsed.code, parsed.message ?? 'Plan limit reached');
+  }
+}
+
 // On-demand lesson body generation. Idempotent: if body is already non-null,
 // the Edge Function returns it without calling Anthropic.
 export async function requestLessonGeneration(lessonId: string): Promise<unknown> {
@@ -194,9 +239,27 @@ export async function requestLessonGeneration(lessonId: string): Promise<unknown
     'lessons-generate',
     { body: { lesson_id: lessonId } },
   );
-  if (error) throw error;
+  if (error) {
+    await throwIfPlanLimit(error);
+    throw error;
+  }
   if (!data?.body) throw new Error('lessons-generate returned no body');
   return data.body;
+}
+
+// Read-only body fetch. Used by the Article screen on every open since the
+// `body` column is REVOKE'd from authenticated. Same plan gate as
+// lessons-generate, but never calls Anthropic.
+export async function requestLessonRead(lessonId: string): Promise<unknown | null> {
+  const { data, error } = await supabase.functions.invoke<{ body: unknown | null }>(
+    'lessons-read',
+    { body: { lesson_id: lessonId } },
+  );
+  if (error) {
+    await throwIfPlanLimit(error);
+    throw error;
+  }
+  return data?.body ?? null;
 }
 
 // Fire-and-forget after markLessonComplete. The Edge Function checks the
@@ -242,10 +305,35 @@ export async function sendChatMessage(
     user: ChatMessage;
     assistant: ChatMessage;
   }>('chat-send', { body: { lesson_id: lessonId, content } });
-  if (error) throw error;
+  if (error) {
+    await throwIfPlanLimit(error);
+    throw error;
+  }
   if (!data?.user || !data?.assistant) {
     throw new Error('chat-send returned malformed response');
   }
+  return data;
+}
+
+// ----- Phase 7: Stripe billing -----
+
+export async function startBillingCheckout(): Promise<{ url: string }> {
+  const { data, error } = await supabase.functions.invoke<{ url: string }>(
+    'billing-checkout',
+    { body: {} },
+  );
+  if (error) throw error;
+  if (!data?.url) throw new Error('billing-checkout returned no URL');
+  return data;
+}
+
+export async function startBillingPortal(): Promise<{ url: string }> {
+  const { data, error } = await supabase.functions.invoke<{ url: string }>(
+    'billing-portal',
+    { body: {} },
+  );
+  if (error) throw error;
+  if (!data?.url) throw new Error('billing-portal returned no URL');
   return data;
 }
 

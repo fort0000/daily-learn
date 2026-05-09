@@ -32,7 +32,7 @@
 | 4 | Edge Function `courses-generate`(コース一括生成) | ✅ done |
 | 5 | Edge Function `lessons-generate` + `chat-send`(本文 + AIアシスタント) | ✅ done |
 | 6 | React Router 化(URL ベースルーティング + スワイプ戻る対応) | ✅ done |
-| 7 | Stripe Checkout + Webhook で無料/有料プラン制御 | ⏳ |
+| 7 | Stripe Checkout + Webhook で 3 軸プラン制御(コース/レッスン/AIチャット) | ✅ done |
 
 ---
 
@@ -298,20 +298,64 @@
 
 ## Phase 7 — Stripe で無料/有料プラン制御
 
-**ゴール**: 無料プランは 1 コースまで、有料プランは無制限。Account 画面からプラン切替ができる。
+**ゴール**: 無料/有料プランの 3 軸の制限(コース数・レッスン受講数・AIアシスタント)をサーバー側で強制し、Account 画面からプラン切替ができる。
+
+**プラン仕様**
+
+| 制限 | 無料プラン | 有料プラン |
+|---|---|---|
+| 作成可能コース数(累計、`status != archived`) | **1 コースまで** | 無制限 |
+| 受講可能レッスン数(=開封できる Day 範囲) | **Day 1〜10 のみ** | 全 30 Day |
+| AIアシスタント(チャット) | **使用不可** | 無制限 |
+
+- 「受講可能」= **レッスンを開いて本文を読める範囲**。無料プランは Day 11 以降を開けない。判定は `lesson.day` ベース(無料ユーザーは 1 コースしか持てないので「Day 11 = 11 件目」と等価)
+- **無料ユーザーが上限に触れた瞬間、コース系の動線は `/upgrade` 画面に直行させる**(個別の inline エラーは出さず動線を一本化):
+  - Day 11 以降のレッスンセルをタップ → `/upgrade` へ `replace` 遷移
+  - 既に 1 コース持っている状態で「新しい学習コースを作る」をタップ → Create 画面に行かず **`/upgrade` へ `replace` 遷移**
+- **Chat は遷移させず、画面内で完結**: 無料プランで Chat 画面に入った場合、入力欄を非活性化し、「AIアシスタントは有料プランで使えます」というインライン通知のみ表示する(`/upgrade` への自動遷移はしない)
+- AIアシスタントは Phase 5 で実装した `chat-send` Edge Function に gate を入れる(無料プランは 402)
+- 無料プランで上限に達したときの UI は **アップグレード CTA を最も目立たせる**(エラーで終わらせず Stripe Checkout に誘導)
+
+**`/upgrade` 画面の仕様**(新規)
+- ルート: `/upgrade` を Phase 6 で定義した protected ルートに追加(要ログイン)
+- 上部: 「以降のレッスンは有料プランで解放されます」+ アイコン
+- 中央: プラン比較表(本セクションの仕様表をそのまま UI に落とす)
+- 下部: 「アップグレードする」ボタン → `supabase.functions.invoke('billing-checkout')` → Stripe Checkout URL に遷移
+- 「あとで」リンクで `/home` に戻る(`navigate(-1)` ではなく `/home` 直行 — Day 11 を開いた状態が履歴に残っていないので戻りにくい)
 
 **やること**
 - Stripe ダッシュボードで Product/Price を作成、`STRIPE_*` を `supabase secrets set` で Edge Function 環境変数へ
 - `supabase/functions/billing-checkout/index.ts`: Checkout Session 発行(ユーザー文脈クライアントで `auth.uid()` を取得して `client_reference_id` に設定)
 - `supabase/functions/billing-portal/index.ts`: Customer Portal リダイレクト
 - `supabase/functions/billing-webhook/index.ts`: `checkout.session.completed` / `customer.subscription.deleted` で `profiles.plan` を `'paid'` / `'free'` に更新(service_role)。**JWT 検証はオフ**にする必要がある(Stripe からの Webhook には Supabase JWT が乗らない)。`supabase/config.toml` で `[functions.billing-webhook] verify_jwt = false` を設定し、Stripe 署名(`stripe-signature` ヘッダ)で改ざん検証
-- `courses-generate` 側で「無料プランかつアクティブコースが既に 1 件」なら 402 を返す
-- `Account.tsx`: 現在のプラン表示 + 「アップグレード」/「管理する」ボタン(`supabase.functions.invoke('billing-checkout' / 'billing-portal')`)
+- **3 軸のサーバーサイド gate**(`profiles.plan` を毎回参照):
+  - `courses-generate`: 無料プランかつ `courses` で `status IN ('generating', 'active', 'completed')` の行が 1 件以上 → 402 + `{ code: 'PLAN_LIMIT_COURSES' }`
+  - **レッスン本文の取得自体に gate**: `lessons-generate` Edge Function に「無料プランかつ `lesson.day > 10` なら本文を返さず 402 + `{ code: 'PLAN_LIMIT_LESSONS' }`」を追加。さらに、既存の `body` を `fetchLesson` で読む経路にも RLS / RPC で同じ判定を入れる。具体的には:
+    - `lessons` の SELECT を許可する RLS ポリシーに「`(profiles.plan = 'paid') OR (lessons.day <= 10)` のときのみ `body` を返す」条件を入れるのが理想だが、PostgREST の RLS は行単位なのでカラム単位の制限は不可。代替として **`lesson.body` の取得を `fetchLessonBody(lesson_id)` という SECURITY DEFINER の Postgres 関数経由にする**(タイトル/概要は引き続き直接 SELECT 可。ロードマップの 30 マスは無料でも全部見える)
+    - もしくは Edge Function `lessons-read` を経由させ、無料 + day > 10 なら 402(よりシンプル。本文生成と同じ口を叩くなら `lessons-generate` を読み取り兼用にしても良い)
+  - `chat-send`: 無料プラン → 402 + `{ code: 'PLAN_LIMIT_CHAT' }`(無料は使用不可、メッセージは保存しない)
+- `src/screens/Upgrade.tsx`(新規): 上記 `/upgrade` 画面の実装。`profiles.plan` を読み、既に有料なら自動で `/home` に戻す
+- `Account.tsx`: 現在のプラン表示 + 「アップグレード」/「管理する」ボタン(無料: `/upgrade` に飛ぶ / 有料: `billing-portal` を叩く)。プラン比較は `/upgrade` に集約し、Account ではプラン名だけ示す
+- **UI 側ゲート(サーバー側 gate と二重で持つ。すべて `/upgrade` 直行で動線を一本化)**:
+  - **Roadmap のセル**: 無料プランかつ `day > 10` のセルは現状の `'future'` / `'locked'` 表示と同じ見た目のまま(文言は変えない)。タップしたら Article ではなく `/upgrade` へ `replace` で遷移
+  - **Home の Today カード**: 無料プランで進行中のレッスンが Day 11 以上に達した場合も、ボタン文言は現状(「今日の学びを始める →」)のまま。タップ時の遷移先を `/upgrade` に切り替えるだけ
+  - **Home の「新しい学習コースを作る」CTA**: 無料プランで既にコースを 1 件持っている場合も、ボタン文言は現状のまま。タップ時の遷移先を `/create` ではなく `/upgrade` に切替
+  - **Create 画面の保険**: 直リンクで `/create` に来た場合の保険として、マウント時に「無料プランかつ既に 1 コース」を判定して即 `navigate('/upgrade', { replace: true })`(履歴に `/create` を残さない)
+  - **Article 画面の保険**: 直リンク・ディープリンクで Day 11 以降を開かれた場合、マウント時に `lesson.day > 10 && profile.plan === 'free'` を判定して即 `navigate('/upgrade', { replace: true })`
+  - Chat 画面: 無料プランは入力欄を非活性化し、「AIアシスタントは有料プランで使えます」とだけインライン表示(`/upgrade` への CTA は出さない)
+  - Profile 画面のプラン枠: 現状の表示(`planLabel` / `planHint`)を本物の `profiles.plan` 値に切替。「変更 →」タップで `/upgrade`(無料) / `billing-portal`(有料)
 
 **受け入れ条件**
 - カードテストモードで無料 → 有料 → 解約の往復が動く
-- 無料プランで 2 コース目を作ろうとすると上限エラーが UI で出る
-- Webhook 失敗時のリトライで状態が壊れない(冪等性: `event.id` を記録)
+- 無料プランで 2 コース目を作ろうとすると(Home の CTA タップ or `/create` 直リンク)、Create 画面を表示せず即 `/upgrade` に遷移する。仮にクライアントを改造して `courses-generate` を直接叩いても 402 で拒否される
+- 無料プランの Roadmap で Day 11 以降のセルが鍵表示になり、タップすると `/upgrade` に遷移する(履歴に Day 11 が残らない)
+- 無料プランで Day 11 のディープリンク `/lessons/<day11_id>` を直接開いても本文は表示されず `/upgrade` に飛ばされる(クライアントを改造しても本文は取れない=サーバー側で 402)
+- 無料プランで Day 1〜10 は普通に開けて、本文も読めて、完了アクションも通る
+- 無料プランの Chat 画面では入力欄が非活性で「AIアシスタントは有料プランで使えます」と表示される(画面遷移は発生しない / 送信を強行しても 402 で拒否)
+- 有料プランへ切り替え後はそれぞれの制限が即座に解除される(`profiles.plan` を毎回読むため、再ログイン不要)
+- 解約直後(`customer.subscription.deleted` 受信)に再び制限が復活し、Day 11 以降のレッスンが鍵表示に戻る(過去に開いていても再アクセス時にゲート発動)
+- `/upgrade` 画面に有料プランでアクセスすると `/home` に自動リダイレクトされる
+- Webhook 失敗時のリトライで状態が壊れない(冪等性: `event.id` を `billing_events` テーブル等に記録して重複実行を弾く)
 
 ---
 

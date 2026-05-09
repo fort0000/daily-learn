@@ -13,6 +13,7 @@ import {
   useProfile,
   useSession,
 } from '../lib/auth';
+import { startBillingPortal } from '../lib/db';
 
 const inputClass =
   'w-full box-border bg-white border-[1.5px] border-dl-border rounded-2xl px-3.5 py-3 text-sm font-bold text-dl-navy font-jp outline-none';
@@ -116,6 +117,8 @@ export function AccountScreen() {
       </div>
 
       <div className="absolute top-[70px] bottom-0 left-0 right-0 overflow-y-auto pt-1 px-5 pb-[120px]">
+        <PlanRow plan={profile?.plan ?? null} />
+
         <AccountField label="名前">
           <input
             value={name}
@@ -220,6 +223,62 @@ function AccountField({
       {children}
       {hint && (
         <div className="text-[11px] font-bold text-dl-slate font-jp mt-1.5 leading-[1.5]">{hint}</div>
+      )}
+    </div>
+  );
+}
+
+function PlanRow({ plan }: { plan: 'free' | 'paid' | null }) {
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
+
+  const handlePortal = async () => {
+    if (loading) return;
+    setLoading(true);
+    try {
+      const { url } = await startBillingPortal();
+      window.location.href = url;
+    } catch (e) {
+      console.error('[Account] portal failed:', e);
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="mb-4 rounded-2xl border-[1.5px] border-dl-border bg-white px-3.5 py-3 flex items-center gap-3">
+      <div
+        className="px-2.5 py-1 rounded-full text-[11px] font-black font-jp text-[#78350F]"
+        style={{
+          background:
+            plan === 'paid'
+              ? 'linear-gradient(90deg, #FACC15 0%, #F59E0B 100%)'
+              : '#F5EDDF',
+        }}
+      >
+        {plan === 'paid' ? '有料プラン' : '無料プラン'}
+      </div>
+      <div className="flex-1 text-[11px] font-bold text-dl-slate font-jp">
+        {plan === 'paid'
+          ? 'すべての機能を利用可能'
+          : 'Day 11 以降と AIアシスタントを解放'}
+      </div>
+      {plan === 'paid' ? (
+        <button
+          type="button"
+          onClick={handlePortal}
+          disabled={loading}
+          className="text-xs font-black text-dl-primary font-jp disabled:opacity-50"
+        >
+          {loading ? '...' : '管理する →'}
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={() => navigate('/upgrade')}
+          className="text-xs font-black text-dl-primary font-jp"
+        >
+          アップグレード →
+        </button>
       )}
     </div>
   );

@@ -84,6 +84,24 @@ Deno.serve(async (req: Request) => {
     });
   }
 
+  // Plan gate: don't burn Batch credits prefetching Day 11+ for free users.
+  // They can't open it anyway (lessons-generate / lessons-read 402s).
+  const adminForPlan = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!, {
+    auth: { persistSession: false },
+  });
+  const { data: profile } = await adminForPlan
+    .from("profiles")
+    .select("plan")
+    .eq("id", user.id)
+    .maybeSingle();
+  const plan = (profile as { plan: "free" | "paid" } | null)?.plan ?? "free";
+  if (plan === "free" && completedDay + 1 > 10) {
+    return new Response(JSON.stringify({ skipped: "plan_limit" }), {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
   // Frontier check: the completed lesson must be the max(day) completed in
   // this course. Past-day completions don't trigger Batch (avoids re-running
   // generation when the user fills in old gaps).
@@ -189,15 +207,12 @@ Deno.serve(async (req: Request) => {
   const batchJson = (await batchRes.json()) as { id?: string };
   if (!batchJson.id) return jsonError(502, "batch_submit_failed", "No batch id in response");
 
-  const admin = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!, {
-    auth: { persistSession: false },
-  });
   // Same race protection: only set prefetch_batch_id if the row is still
   // both empty and unenqueued. If two completions raced, the loser observes
   // the row already has a batch_id and the second batch is silently leaked
   // (Anthropic eventually expires it). Acceptable — we already pay for the
   // first one.
-  const { error: updErr } = await admin
+  const { error: updErr } = await adminForPlan
     .from("lessons")
     .update({
       prefetch_batch_id: batchJson.id,

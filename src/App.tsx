@@ -22,24 +22,32 @@ import { UpgradeScreen } from './screens/Upgrade';
 
 export function App() {
   return (
-    <Shell>
-      <Routes>
-        <Route path="/" element={<FullStage><LandingScreen /></FullStage>} />
-        <Route path="/login" element={<FullStage><LoginScreen /></FullStage>} />
-        <Route path="/auth/callback" element={<FullStage><AuthCallbackScreen /></FullStage>} />
-        <Route element={<RequireAuth><AppLayout /></RequireAuth>}>
-          <Route path="/home" element={<HomeScreen />} />
-          <Route path="/roadmap" element={<RoadmapScreen />} />
-          <Route path="/lessons/:lessonId" element={<ArticleScreen />} />
-          <Route path="/lessons/:lessonId/chat" element={<ChatScreen />} />
-          <Route path="/create" element={<CreateScreen />} />
-          <Route path="/profile" element={<ProfileScreen />} />
-          <Route path="/profile/account" element={<AccountScreen />} />
-          <Route path="/upgrade" element={<UpgradeScreen />} />
-        </Route>
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </Shell>
+    <Routes>
+      {/* Landing page renders full-width — no constrained shell. */}
+      <Route path="/" element={<LandingScreen />} />
+      <Route
+        path="*"
+        element={
+          <Shell>
+            <Routes>
+              <Route path="/login" element={<FullStage><LoginScreen /></FullStage>} />
+              <Route path="/auth/callback" element={<FullStage><AuthCallbackScreen /></FullStage>} />
+              <Route element={<RequireAuth><AppLayout /></RequireAuth>}>
+                <Route path="/home" element={<HomeScreen />} />
+                <Route path="/roadmap" element={<RoadmapScreen />} />
+                <Route path="/lessons/:lessonId" element={<ArticleScreen />} />
+                <Route path="/lessons/:lessonId/chat" element={<ChatScreen />} />
+                <Route path="/create" element={<CreateScreen />} />
+                <Route path="/profile" element={<ProfileScreen />} />
+                <Route path="/profile/account" element={<AccountScreen />} />
+                <Route path="/upgrade" element={<UpgradeScreen />} />
+              </Route>
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </Shell>
+        }
+      />
+    </Routes>
   );
 }
 

@@ -317,10 +317,14 @@ export async function sendChatMessage(
 
 // ----- Phase 7: Stripe billing -----
 
-export async function startBillingCheckout(): Promise<{ url: string }> {
+export type BillingCadence = 'monthly' | 'yearly';
+
+export async function startBillingCheckout(
+  billing: BillingCadence = 'monthly',
+): Promise<{ url: string }> {
   const { data, error } = await supabase.functions.invoke<{ url: string }>(
     'billing-checkout',
-    { body: {} },
+    { body: { billing } },
   );
   if (error) throw error;
   if (!data?.url) throw new Error('billing-checkout returned no URL');

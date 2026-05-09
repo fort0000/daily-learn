@@ -11,7 +11,11 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const STRIPE_SECRET_KEY = Deno.env.get("STRIPE_SECRET_KEY");
-const STRIPE_PRICE_ID = Deno.env.get("STRIPE_PRICE_ID");
+// Two prices: monthly and yearly. STRIPE_PRICE_ID is kept as a fallback for
+// older deployments that only configured one.
+const STRIPE_PRICE_ID_MONTHLY =
+  Deno.env.get("STRIPE_PRICE_ID_MONTHLY") ?? Deno.env.get("STRIPE_PRICE_ID");
+const STRIPE_PRICE_ID_YEARLY = Deno.env.get("STRIPE_PRICE_ID_YEARLY");
 const APP_BASE_URL = Deno.env.get("APP_BASE_URL");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
@@ -19,14 +23,14 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
 if (
   !STRIPE_SECRET_KEY ||
-  !STRIPE_PRICE_ID ||
+  !STRIPE_PRICE_ID_MONTHLY ||
   !APP_BASE_URL ||
   !SUPABASE_URL ||
   !SUPABASE_ANON_KEY ||
   !SUPABASE_SERVICE_ROLE_KEY
 ) {
   throw new Error(
-    "Missing env: STRIPE_SECRET_KEY / STRIPE_PRICE_ID / APP_BASE_URL / SUPABASE_*",
+    "Missing env: STRIPE_SECRET_KEY / STRIPE_PRICE_ID_MONTHLY (or STRIPE_PRICE_ID) / APP_BASE_URL / SUPABASE_*",
   );
 }
 
@@ -64,6 +68,22 @@ Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return jsonError(405, "method_not_allowed", "POST only");
 
+  // Body is optional; defaults to monthly so deployments without a yearly
+  // price configured still work end-to-end.
+  let payload: { billing?: "monthly" | "yearly" } = {};
+  try {
+    const text = await req.text();
+    if (text) payload = JSON.parse(text);
+  } catch {
+    return jsonError(400, "invalid_json", "Body must be JSON");
+  }
+  const billing: "monthly" | "yearly" = payload.billing === "yearly" ? "yearly" : "monthly";
+  const priceId =
+    billing === "yearly" ? STRIPE_PRICE_ID_YEARLY ?? STRIPE_PRICE_ID_MONTHLY : STRIPE_PRICE_ID_MONTHLY;
+  if (billing === "yearly" && !STRIPE_PRICE_ID_YEARLY) {
+    return jsonError(409, "yearly_unavailable", "STRIPE_PRICE_ID_YEARLY is not configured");
+  }
+
   const authHeader = req.headers.get("Authorization");
   if (!authHeader) return jsonError(401, "unauthorized", "Missing Authorization header");
 
@@ -96,7 +116,7 @@ Deno.serve(async (req: Request) => {
 
   const sessionParams: Record<string, string> = {
     mode: "subscription",
-    "line_items[0][price]": STRIPE_PRICE_ID!,
+    "line_items[0][price]": priceId!,
     "line_items[0][quantity]": "1",
     success_url: `${APP_BASE_URL}/upgrade?status=success&session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${APP_BASE_URL}/upgrade?status=cancel`,
@@ -104,7 +124,9 @@ Deno.serve(async (req: Request) => {
     // Required so the webhook can map back to the auth user even if
     // stripe_customer_id is not yet set on profiles.
     "metadata[user_id]": user.id,
+    "metadata[billing]": billing,
     "subscription_data[metadata][user_id]": user.id,
+    "subscription_data[metadata][billing]": billing,
     allow_promotion_codes: "true",
   };
   if (profile.stripe_customer_id) {

@@ -6,6 +6,7 @@ import { PushButton } from '../components/PushButton';
 import { useProfile, useSession, type Profile } from '../lib/auth';
 import {
   cancelSubscription,
+  changeBillingCadence,
   startBillingCheckout,
   startBillingPortal,
   type BillingCadence,
@@ -21,12 +22,19 @@ export function UpgradeScreen() {
   const [billing, setBilling] = useState<BillingCadence>('monthly');
   const [submitting, setSubmitting] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
+  const [changingCadence, setChangingCadence] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const status = searchParams.get('status');
   const isPaid = profile?.plan === 'paid';
   const isCancelScheduled = !!profile?.subscription_cancel_at;
+  const currentCadence = profile?.subscription_billing ?? null;
+  // Default the toggle to the user's actual cadence when known, so paid users
+  // see "ご利用中" without having to tap the matching tab first.
+  useEffect(() => {
+    if (isPaid && currentCadence) setBilling(currentCadence);
+  }, [isPaid, currentCadence]);
 
   // After Stripe Checkout succeeds, poll the profile until the webhook flips
   // plan to 'paid'. Stays on this screen — the layout itself swaps to the
@@ -77,6 +85,32 @@ export function UpgradeScreen() {
       console.error('[Upgrade] portal failed:', err);
       setError(err instanceof Error ? err.message : 'ポータルの起動に失敗しました');
       setPortalLoading(false);
+    }
+  };
+
+  const handleChangeCadence = async () => {
+    if (changingCadence) return;
+    setError(null);
+    setChangingCadence(true);
+    try {
+      const result = await changeBillingCadence(billing);
+      setProfile((p) =>
+        p
+          ? {
+              ...p,
+              subscription_billing: result.billing,
+              subscription_period_end: result.period_end,
+              // Plan switch clears any pending cancellation.
+              subscription_cancel_at: null,
+            }
+          : p,
+      );
+      refresh();
+    } catch (err) {
+      console.error('[Upgrade] change cadence failed:', err);
+      setError(err instanceof Error ? err.message : 'プラン変更に失敗しました');
+    } finally {
+      setChangingCadence(false);
     }
   };
 
@@ -362,14 +396,23 @@ export function UpgradeScreen() {
                 ))}
               </div>
 
-              {/* CTA — depends on plan state */}
+              {/* CTA depends on plan state and which cadence the toggle is
+                  currently showing. */}
               {isPaid ? (
-                <PaidStatusBox
-                  profile={profile}
-                  isCancelScheduled={isCancelScheduled}
-                  loading={portalLoading}
-                  onPortal={handlePortal}
-                />
+                currentCadence && billing !== currentCadence ? (
+                  <ChangeCadenceCTA
+                    target={billing}
+                    loading={changingCadence}
+                    onChange={handleChangeCadence}
+                  />
+                ) : (
+                  <PaidStatusBox
+                    profile={profile}
+                    isCancelScheduled={isCancelScheduled}
+                    loading={portalLoading}
+                    onPortal={handlePortal}
+                  />
+                )
               ) : (
                 <>
                   <div className={`mt-3.5 ${submitting ? 'opacity-60 pointer-events-none' : ''}`}>
@@ -512,6 +555,44 @@ export function UpgradeScreen() {
         />
       )}
     </Phone>
+  );
+}
+
+function ChangeCadenceCTA({
+  target,
+  loading,
+  onChange,
+}: {
+  target: BillingCadence;
+  loading: boolean;
+  onChange: () => void;
+}) {
+  const label =
+    target === 'yearly' ? '年額プランにアップグレードする' : '月額プランに変更する';
+  const note =
+    target === 'yearly'
+      ? '差額を即時計算 · 2ヶ月分お得になります'
+      : '次回更新日に月額へ切り替わります';
+  return (
+    <>
+      <div className={`mt-3.5 ${loading ? 'opacity-60 pointer-events-none' : ''}`}>
+        <PushButton
+          color={DL.primary}
+          shadow={DL.primaryShadow}
+          fontSize={15}
+          height={54}
+          onClick={onChange}
+        >
+          {loading ? '変更中…' : `${label} →`}
+        </PushButton>
+      </div>
+      <div
+        className="mt-2 text-center text-[10px] font-bold font-jp"
+        style={{ color: '#FFD7B5', opacity: 0.7 }}
+      >
+        {note}
+      </div>
+    </>
   );
 }
 

@@ -11,6 +11,10 @@ export type Profile = {
   // (or is very close to) subscription_period_end.
   subscription_period_end: string | null;
   subscription_cancel_at: string | null;
+  // Cadence the user is currently subscribed at. NULL when unknown
+  // (legacy subscription before this column existed) — UI falls back to
+  // showing both options.
+  subscription_billing: 'monthly' | 'yearly' | null;
   created_at: string;
   updated_at: string;
 };
@@ -128,7 +132,7 @@ export function useProfile(userId: string | null) {
     supabase
       .from('profiles')
       .select(
-        'id, display_name, plan, subscription_period_end, subscription_cancel_at, created_at, updated_at',
+        'id, display_name, plan, subscription_period_end, subscription_cancel_at, subscription_billing, created_at, updated_at',
       )
       .eq('id', userId)
       .maybeSingle()

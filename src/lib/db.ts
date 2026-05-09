@@ -357,6 +357,22 @@ export async function cancelSubscription(): Promise<{
   return { cancel_at: data?.cancel_at ?? null, period_end: data?.period_end ?? null };
 }
 
+// Swap monthly ↔ yearly on the active subscription. Stripe handles proration
+// (immediate credit/charge for the period delta). Returns the new
+// period_end so the UI updates without a webhook round-trip.
+export async function changeBillingCadence(billing: BillingCadence): Promise<{
+  billing: BillingCadence;
+  period_end: string | null;
+}> {
+  const { data, error } = await supabase.functions.invoke<{
+    billing: BillingCadence;
+    period_end: string | null;
+  }>('billing-change-plan', { body: { billing } });
+  if (error) throw error;
+  if (!data?.billing) throw new Error('billing-change-plan returned no billing');
+  return { billing: data.billing, period_end: data.period_end ?? null };
+}
+
 export function subscribeToChatMessages(
   lessonId: string,
   onInsert: (msg: ChatMessage) => void,

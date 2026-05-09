@@ -13,6 +13,9 @@
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 
 const STRIPE_WEBHOOK_SECRET = Deno.env.get("STRIPE_WEBHOOK_SECRET");
+const STRIPE_PRICE_ID_MONTHLY =
+  Deno.env.get("STRIPE_PRICE_ID_MONTHLY") ?? Deno.env.get("STRIPE_PRICE_ID");
+const STRIPE_PRICE_ID_YEARLY = Deno.env.get("STRIPE_PRICE_ID_YEARLY");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
@@ -117,6 +120,22 @@ function toIso(unixSeconds: number | undefined | null): string | null {
   return new Date(unixSeconds * 1000).toISOString();
 }
 
+// Resolve the billing cadence ('monthly' | 'yearly') for a subscription event.
+// Prefers metadata.billing (set by billing-checkout / billing-change-plan)
+// and falls back to price.id comparison so subscriptions created before
+// metadata was wired in still get classified correctly.
+function detectBilling(obj: Record<string, unknown>): "monthly" | "yearly" | null {
+  const meta = (obj.metadata as Record<string, string> | undefined)?.billing;
+  if (meta === "monthly" || meta === "yearly") return meta;
+
+  const items = (obj.items as { data?: Array<{ price?: { id?: string } }> } | undefined)?.data;
+  const priceId = items?.[0]?.price?.id;
+  if (!priceId) return null;
+  if (STRIPE_PRICE_ID_YEARLY && priceId === STRIPE_PRICE_ID_YEARLY) return "yearly";
+  if (STRIPE_PRICE_ID_MONTHLY && priceId === STRIPE_PRICE_ID_MONTHLY) return "monthly";
+  return null;
+}
+
 async function setPlan(
   admin: SupabaseClient,
   userId: string,
@@ -124,6 +143,7 @@ async function setPlan(
   customerId: string | null,
   periodEnd: string | null = null,
   cancelAt: string | null = null,
+  billing: "monthly" | "yearly" | null = null,
 ): Promise<void> {
   const update: Record<string, string | null> = { plan };
   if (customerId) update.stripe_customer_id = customerId;
@@ -132,6 +152,10 @@ async function setPlan(
   // the period_end.
   update.subscription_period_end = periodEnd;
   update.subscription_cancel_at = cancelAt;
+  // Only overwrite billing when we actually detected it. Avoid clobbering a
+  // known cadence with NULL just because a particular event lacks the field.
+  if (billing !== null) update.subscription_billing = billing;
+  if (plan === "free") update.subscription_billing = null;
   const { error } = await admin.from("profiles").update(update).eq("id", userId);
   if (error) throw error;
 }
@@ -186,10 +210,10 @@ Deno.serve(async (req: Request) => {
         console.warn("[billing-webhook] no user_id resolved for event", event.id);
         return ok();
       }
-      // checkout.session doesn't expose period_end directly. The subsequent
-      // customer.subscription.created/updated event will fill it in; for now
-      // just flip plan and clear stale fields.
-      await setPlan(admin, userId, "paid", customerId, null, null);
+      // Checkout passes billing in session metadata too — capture it here so
+      // the cadence is known even before the subscription.created event lands.
+      const billing = detectBilling(obj);
+      await setPlan(admin, userId, "paid", customerId, null, null, billing);
     } else if (
       event.type === "customer.subscription.deleted" ||
       event.type === "customer.subscription.paused"
@@ -199,7 +223,7 @@ Deno.serve(async (req: Request) => {
         console.warn("[billing-webhook] no user_id resolved for event", event.id);
         return ok();
       }
-      await setPlan(admin, userId, "free", customerId, null, null);
+      await setPlan(admin, userId, "free", customerId, null, null, null);
     } else if (
       event.type === "customer.subscription.updated" ||
       event.type === "customer.subscription.created"
@@ -218,13 +242,14 @@ Deno.serve(async (req: Request) => {
       const cancelAt = (obj.cancel_at_period_end as boolean | undefined)
         ? toIso(obj.cancel_at as number | undefined) ?? periodEnd
         : null;
+      const billing = detectBilling(obj);
       const { userId, customerId } = await resolveUserId(admin, obj);
       if (!userId) {
         console.warn("[billing-webhook] no user_id for subscription.updated", event.id);
         return ok();
       }
       const plan = status === "active" || status === "trialing" ? "paid" : "free";
-      await setPlan(admin, userId, plan, customerId, periodEnd, cancelAt);
+      await setPlan(admin, userId, plan, customerId, periodEnd, cancelAt, billing);
     } else {
       // Other events (invoice.*, customer.created, etc.) are recorded for
       // audit but no action taken.

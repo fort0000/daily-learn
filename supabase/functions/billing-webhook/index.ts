@@ -207,7 +207,14 @@ Deno.serve(async (req: Request) => {
       // Handle reactivation / state flips. status: active|trialing → paid,
       // anything else (canceled, unpaid, past_due, incomplete_expired) → free.
       const status = obj.status as string | undefined;
-      const periodEnd = toIso(obj.current_period_end as number | undefined);
+      // Stripe API 2025-09-30+ moved current_period_end from the subscription
+      // object to items.data[].current_period_end. Read item-level first and
+      // fall back to the legacy field so both API versions work.
+      const itemPeriodEnd = (obj.items as
+        | { data?: Array<{ current_period_end?: number }> }
+        | undefined)?.data?.[0]?.current_period_end;
+      const subPeriodEnd = obj.current_period_end as number | undefined;
+      const periodEnd = toIso(itemPeriodEnd ?? subPeriodEnd);
       const cancelAt = (obj.cancel_at_period_end as boolean | undefined)
         ? toIso(obj.cancel_at as number | undefined) ?? periodEnd
         : null;

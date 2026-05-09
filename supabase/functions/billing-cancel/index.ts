@@ -98,7 +98,7 @@ Deno.serve(async (req: Request) => {
     return jsonError(502, "stripe_error", `Stripe ${subsRes.status}`);
   }
   const subs = (await subsRes.json()) as {
-    data: Array<{ id: string; cancel_at: number | null; current_period_end: number }>;
+    data: Array<{ id: string }>;
   };
   const sub = subs.data[0];
   if (!sub) {
@@ -118,11 +118,17 @@ Deno.serve(async (req: Request) => {
   }
   const updated = (await cancelRes.json()) as {
     cancel_at: number | null;
-    current_period_end: number;
     cancel_at_period_end: boolean;
+    current_period_end?: number;
+    items?: { data?: Array<{ current_period_end?: number }> };
   };
 
-  const periodEndIso = toIso(updated.current_period_end);
+  // Stripe API 2025-09-30+ moved current_period_end from the subscription
+  // object to items.data[].current_period_end. Read item-level first and fall
+  // back to the legacy field so this works on both API versions.
+  const periodEndUnix =
+    updated.items?.data?.[0]?.current_period_end ?? updated.current_period_end;
+  const periodEndIso = toIso(periodEndUnix);
   const cancelAtIso = updated.cancel_at_period_end
     ? toIso(updated.cancel_at) ?? periodEndIso
     : null;

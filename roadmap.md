@@ -31,7 +31,8 @@
 | 3 | `courses` + `lessons` スキーマ + 進捗表示 | ⏳ |
 | 4 | Edge Function `courses-generate`(コース一括生成) | ✅ done |
 | 5 | Edge Function `lessons-generate` + `chat-send`(本文 + AIアシスタント) | ✅ done |
-| 6 | Stripe Checkout + Webhook で無料/有料プラン制御 | ⏳ |
+| 6 | React Router 化(URL ベースルーティング + スワイプ戻る対応) | ✅ done |
+| 7 | Stripe Checkout + Webhook で無料/有料プラン制御 | ⏳ |
 
 ---
 
@@ -211,7 +212,91 @@
 
 ---
 
-## Phase 6 — Stripe で無料/有料プラン制御
+## Phase 6 — React Router 化(URL ベースルーティング)
+
+**ゴール**: 各画面に固有 URL を割り当て、ブラウザの履歴スタックに乗せることで **iOS Safari のエッジスワイプ / Android のジェスチャ戻る** がそのまま画面戻りとして機能する状態にする。副次効果として、リロードで同じ画面が復元され、レッスンや特定タブへのディープリンクが可能になる。
+
+**現状(置き換え対象)**
+- `App.tsx` が `useState<Route>` + `NavContext` で擬似ルーティング(`src/lib/nav.tsx`)
+- 全画面が単一 URL `/` で動的に切替。履歴スタックに積まれず、戻るジェスチャがアプリ自体を閉じる
+- 戻るボタンは画面左上にあり、片手操作だと押しにくい
+
+**URL 設計**
+
+| パス | 画面 | 認可 |
+|---|---|---|
+| `/` | **Landing Page(LP / 公開)** | 認可不要 |
+| `/home` | Home(ログイン後トップ) | 要ログイン |
+| `/roadmap` | Roadmap(アクティブコース) | 要ログイン |
+| `/lessons/:lessonId` | Article(レッスン本文) | 要ログイン |
+| `/lessons/:lessonId/chat` | Chat(AIアシスタント) | 要ログイン |
+| `/create` | Create(コース作成) | 要ログイン |
+| `/profile` | Profile | 要ログイン |
+| `/profile/account` | Account(プロフィール編集) | 要ログイン |
+| `/login` | Login | 未ログインのみ |
+| `/auth/callback` | AuthCallback | 認可不要 |
+
+- ルート `/` は **未ログイン/ログイン済みのどちらでもアクセス可能な LP**(マーケティング/ファーストビュー用途)。ログイン済みユーザーが LP の「アプリを開く」ボタンを押したら `/home` へ遷移
+- LP からの導線: 「無料で始める」→ `/login`(サインアップタブ)、「ログイン」→ `/login`、「アプリを開く(ログイン済みのみ表示)」→ `/home`
+- パラメータは URL から取る(`useParams`)。検索状態など一時的な状態は `useSearchParams`
+- `lessonId` を URL に出すことで、ホーム→記事→チャットの戻りがすべて履歴で表現できる(現状 `route.params.lessonId` で渡していた経路を URL に正規化)
+
+**やること**
+- `npm i react-router-dom`
+- `src/main.tsx`: `<BrowserRouter>` で `<App />` をラップ
+- `src/screens/Landing.tsx` 新規作成: **本フェーズではプレースホルダ実装に留める**(本格的な LP デザインは別フェーズで対応)。最低限の構成は以下:
+  - サービス名 + 1 行キャッチコピー + マスコット画像
+  - CTA ボタン: 「ログイン / 新規登録」→ `/login`
+  - **ログイン済みのときのみ**「アプリを開く」ボタンを追加表示 → `/home`
+  - サイドバーは出さない(全画面レイアウト)
+  - TODO コメントで「LP リニューアル予定」を明記し、後続フェーズで差し替えやすくする
+- `src/App.tsx`: `useState<Route>` / `NavContext` を撤去し、`<Routes>` で URL→画面のマッピングに置換
+  - 認可ガード `<RequireAuth>` を挿入し、未ログイン時は `<Navigate to="/login" state={{ from: location }} />`
+  - ログイン後は `state.from` のパスへ戻す(なければ `/home`)
+  - `session.status === 'loading'` 時の空表示はそのまま維持
+  - ルート `/` は LP(公開)、サイドバーありのアプリレイアウトは `/home` 以下に集約
+- `src/lib/nav.tsx`: 削除。`useNav().navigate(name, params)` の呼び出し箇所を `useNavigate()` + 文字列パスに置換
+  - `navigate('article', { lessonId })` → `navigate(`/lessons/${lessonId}`)`
+  - 戻るボタンは `navigate(-1)` に統一(=スワイプ戻ると同じ挙動)
+- `src/components/Sidebar.tsx`: タブを `<NavLink to="/home" replace>` 系に置き換え。`isActive` でハイライト
+  - **サイドバータブ間の遷移は `replace: true` で履歴を積まない**。タブはネイティブの「ボトムタブ」と同じピア関係なので、Home ⇄ Profile をエッジスワイプで往復させない設計
+  - 対象タブ: `/home`, `/profile`(=サイドバー直下のトップレベル画面の 2 つ)
+  - 例: `/lessons/xxx` 閲覧中にサイドバーから `/profile` をタップ → 履歴の現在位置 `/lessons/xxx` が `/profile` に置換され、`/profile` でエッジスワイプすると `/home`(`/lessons/xxx` の元のスタック)に戻る挙動になる
+  - `/roadmap` はサイドバータブではなく Home からの遷移先扱いなので、通常の push 遷移(=スワイプで `/home` に戻る)
+- **レッスン本文 ⇄ チャットの相互遷移も `replace: true`** にする
+  - `/lessons/:lessonId`(Article)と `/lessons/:lessonId/chat`(Chat)は同じレッスンに対するピアビュー扱い。両者の切替は履歴に積まない
+  - 想定動線: `/home` → `/lessons/xxx`(push) → 「アシスタントに質問」ボタンで `/lessons/xxx/chat`(replace) → エッジスワイプで `/home` に戻る(=Article は履歴上 chat に置換されているので飛ばされる)
+  - 逆方向(`/lessons/xxx/chat` → `/lessons/xxx` の本文に戻る)も `replace: true`。これにより本文⇄チャットのトグルでスタックが膨らまない
+  - 「特定のレッスンの本文/チャット」を直接開くディープリンクは引き続き両方の URL で可能(URL は別々のまま)
+- 既存の戻るボタン(Article/Chat/Account/Create 上部)は残しつつ、ハンドラを `navigate(-1)` 化(=こちらは履歴を 1 つ戻す通常パターン)
+- 画面遷移演出: `useLocation()` の `pathname` を `key` にして `animate-dlfade` をかけ続ける(現行 `key={route.name}` の置き換え)
+- スクロールトップ: `<ScrollToTop />` コンポーネントを作り、`useLocation` の変化で `stageRef.scrollTop = 0`(現行 `requestAnimationFrame` 相当の挙動を維持)
+- `AuthCallback.tsx`: 現状 `window.location.pathname === '/auth/callback'` を直接判定しているが、ルート定義済みなので URL 直書き判定を撤去。コールバック完了後は `navigate('/home', { replace: true })`(履歴に `/auth/callback` を残さない)
+- Cloudflare Pages の SPA フォールバック設定: 全パスを `index.html` に返すよう `_redirects` に `/* /index.html 200` を追加(deep link でリロードしても 404 にならない)
+
+**受け入れ条件**
+- 未ログインで `/` を開くと **LP が表示される**(ログイン画面に飛ばない)
+- LP の「無料で始める」/「ログイン」ボタンで `/login` へ遷移
+- ログイン済みで `/` を開いた場合も LP が表示され、「アプリを開く」ボタンで `/home` に遷移できる(自動リダイレクトはしない)
+- iOS Safari で `/home` → `/lessons/<uuid>` → `/lessons/<uuid>/chat` と進んだ後、**画面端からのエッジスワイプで `/home` に戻る**(Article ⇄ Chat はピアビューなのでスワイプ 1 回で `/home` まで戻る)
+- **サイドバータブ間(`/home` ⇄ `/profile`)はエッジスワイプで往復しない**。タブ切替は `replace: true` で履歴に積まれないため、`/profile` でスワイプ戻っても `/home` には戻らない(直前にいた画面 or LP に戻る)
+- **レッスン本文 ⇄ チャット間もエッジスワイプで往復しない**(`replace: true`)。チャットからスワイプ戻ると Article ではなくレッスンを開く前の画面(`/home` or `/roadmap`)へ
+- Android Chrome のジェスチャ戻る/物理戻るキーで同じ動きになる
+- 任意の画面でリロードしても同じ画面に復帰する(URL に状態が乗っている)
+- `/lessons/<uuid>` を直接開くと、未ログインなら `/login` へ飛び、ログイン後に元の URL に戻る
+- ログアウトすると `/login` に飛び、保護された URL を直打ちすると `/login` に弾かれる(LP `/` は別途トップバー等から明示的に到達)
+- 戻るボタンとスワイプ戻るが同じ挙動(=どちらも `history.back()` 相当)
+- AuthCallback 完了後、ブラウザ履歴の戻るで `/auth/callback` に戻らない(`replace: true`)
+
+**設計メモ**
+- React Router v6 系を採用(現行の React 18+ と整合)。`createBrowserRouter` ではなく `<BrowserRouter>` + `<Routes>` のシンプル構成で十分(loader/action は使わない)
+- URL に lessonId を出すと、URL から直接 `lessons` 行を取りに行く責務が Article/Chat 画面側に移る。現行は `route.params` で親から渡していた箇所があるので、必要なら画面内で `fetchLessonById(lessonId)` を呼ぶ
+- 「スワイプ追従アニメーション」までは作らない(iOS ネイティブのエッジスワイプは標準のページ戻り UI で十分)。本格的なネイティブ風遷移が必要になった段階で `framer-motion` + 自前ジェスチャ実装に拡張する余地は残す
+- React Router の追加 bundle は ~12KB gzip 程度。現状の Vite ビルドへの影響は無視できる
+
+---
+
+## Phase 7 — Stripe で無料/有料プラン制御
 
 **ゴール**: 無料プランは 1 コースまで、有料プランは無制限。Account 画面からプラン切替ができる。
 

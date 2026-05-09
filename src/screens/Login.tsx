@@ -1,4 +1,5 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { DL } from '../lib/dl';
 import { Phone } from '../components/Phone';
 import { StatusBar } from '../components/StatusBar';
@@ -8,6 +9,7 @@ import {
   signInWithOAuth,
   signInWithPassword,
   signUpWithPassword,
+  useSession,
   type OAuthProvider,
 } from '../lib/auth';
 
@@ -17,6 +19,9 @@ const inputClass =
   'w-full box-border bg-white border-[1.5px] border-dl-border rounded-2xl px-3.5 py-3 text-sm font-bold text-dl-navy font-jp outline-none';
 
 export function LoginScreen() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const session = useSession();
   const [mode, setMode] = useState<Mode>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -24,6 +29,14 @@ export function LoginScreen() {
   const [pending, setPending] = useState<null | 'email' | OAuthProvider>(null);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+
+  // After successful sign-in, send the user back where they came from (set by
+  // RequireAuth) or fall through to /home.
+  useEffect(() => {
+    if (session.status !== 'signed-in') return;
+    const from = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname;
+    navigate(from && from !== '/login' ? from : '/home', { replace: true });
+  }, [session.status, location.state, navigate]);
 
   const passwordValid = password.length >= 8;
   const emailValid = email.includes('@');

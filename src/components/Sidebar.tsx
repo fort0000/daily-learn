@@ -1,19 +1,18 @@
+import { NavLink } from 'react-router-dom';
 import { DL } from '../lib/dl';
-import { useNav, type RouteName } from '../lib/nav';
 import { AppIcon } from './AppIcon';
 
 type Item = {
-  id: RouteName;
+  to: string;
   label: string;
   sub: string;
   icon: (active: boolean) => JSX.Element;
 };
 
 export function Sidebar() {
-  const { route, navigate } = useNav();
   const items: Item[] = [
     {
-      id: 'home',
+      to: '/home',
       label: 'ホーム',
       sub: '今日のレッスン',
       icon: (active) => (
@@ -29,7 +28,7 @@ export function Sidebar() {
       ),
     },
     {
-      id: 'profile',
+      to: '/profile',
       label: 'プロフィール',
       sub: '記録・バッジ',
       icon: (active) => (
@@ -66,38 +65,42 @@ export function Sidebar() {
       </div>
 
       <nav className="flex flex-col gap-1">
-        {items.map((t) => {
-          const isActive = route.name === t.id;
-          return (
-            <button
-              key={t.id}
-              onClick={() => navigate(t.id)}
-              className={`flex items-center gap-3 p-3 rounded-[14px] cursor-pointer text-left transition-[background,border-color] duration-[120ms] border-[1.5px] font-sans ${
+        {items.map((t) => (
+          <NavLink
+            key={t.to}
+            to={t.to}
+            replace
+            className={({ isActive }) =>
+              `flex items-center gap-3 p-3 rounded-[14px] cursor-pointer text-left transition-[background,border-color] duration-[120ms] border-[1.5px] font-sans ${
                 isActive
                   ? 'bg-dl-primary border-dl-primary shadow-[0_3px_0_#C8431A]'
                   : 'bg-transparent border-transparent hover:bg-dl-cream'
-              }`}
-            >
-              <span className="w-5 h-5 flex shrink-0">{t.icon(isActive)}</span>
-              <span className="flex flex-col gap-0.5">
-                <span
-                  className={`text-sm font-black font-jp leading-[1.1] ${
-                    isActive ? 'text-white' : 'text-dl-navy'
-                  }`}
-                >
-                  {t.label}
+              }`
+            }
+          >
+            {({ isActive }) => (
+              <>
+                <span className="w-5 h-5 flex shrink-0">{t.icon(isActive)}</span>
+                <span className="flex flex-col gap-0.5">
+                  <span
+                    className={`text-sm font-black font-jp leading-[1.1] ${
+                      isActive ? 'text-white' : 'text-dl-navy'
+                    }`}
+                  >
+                    {t.label}
+                  </span>
+                  <span
+                    className={`text-[10px] font-bold font-jp ${
+                      isActive ? 'text-white/85' : 'text-dl-slate-light'
+                    }`}
+                  >
+                    {t.sub}
+                  </span>
                 </span>
-                <span
-                  className={`text-[10px] font-bold font-jp ${
-                    isActive ? 'text-white/85' : 'text-dl-slate-light'
-                  }`}
-                >
-                  {t.sub}
-                </span>
-              </span>
-            </button>
-          );
-        })}
+              </>
+            )}
+          </NavLink>
+        ))}
       </nav>
 
       <div className="flex-1" />

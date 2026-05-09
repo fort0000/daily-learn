@@ -1,6 +1,6 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { DL } from '../lib/dl';
-import { useNav } from '../lib/nav';
 import { Phone } from '../components/Phone';
 import { StatusBar } from '../components/StatusBar';
 import { TabBar } from '../components/TabBar';
@@ -23,8 +23,9 @@ type Cell = {
 };
 
 export function RoadmapScreen() {
-  const { route, navigate } = useNav();
-  const courseIdParam = (route.params?.courseId as string | undefined) ?? null;
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const courseIdParam = searchParams.get('courseId');
 
   const [course, setCourse] = useState<Course | null>(null);
   const [lessons, setLessons] = useState<Lesson[] | null>(null);
@@ -82,7 +83,7 @@ export function RoadmapScreen() {
       <div className="pt-1 px-5 pr-[76px] pb-2.5">
         <div className="flex items-center gap-2.5 mb-3">
           <div
-            onClick={() => navigate('home')}
+            onClick={() => navigate(-1)}
             className="w-[38px] h-[38px] rounded-xl bg-white border-[1.5px] border-dl-border flex items-center justify-center cursor-pointer shrink-0"
           >
             <svg width="16" height="16" viewBox="0 0 16 16">
@@ -237,7 +238,7 @@ const PATH_POSITIONS = [110, 160, 200, 230, 240, 230, 200, 160, 110, 60, 30, 20,
 const PATH_CENTER_X = 180; // approx phone-content midline
 
 function Node({ cell, idx, pulse }: NodeProps) {
-  const { navigate } = useNav();
+  const navigate = useNavigate();
   const { day, state, lesson } = cell;
   const left = PATH_POSITIONS[idx % PATH_POSITIONS.length]!;
 
@@ -272,7 +273,7 @@ function Node({ cell, idx, pulse }: NodeProps) {
   return (
     <div
       onClick={() => {
-        if (navigable && lesson) navigate('article', { lessonId: lesson.id });
+        if (navigable && lesson) navigate(`/lessons/${lesson.id}`);
       }}
       className={`relative h-[72px] ${navigable ? 'cursor-pointer' : 'cursor-not-allowed'}`}
     >

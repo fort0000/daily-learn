@@ -1,16 +1,22 @@
 import { useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { DL } from '../lib/dl';
-import { useNav, type RouteName } from '../lib/nav';
 
-type Props = { active?: RouteName };
+type ActiveTab = 'home' | 'profile';
+
+type Props = { active?: ActiveTab };
 
 // Hamburger menu (top-right). Hidden on desktop where the sidebar takes over.
-export function TabBar({ active = 'home' }: Props) {
+export function TabBar({ active }: Props) {
   const [open, setOpen] = useState(false);
-  const { navigate } = useNav();
-  const items: { id: RouteName; label: string; sub: string }[] = [
-    { id: 'home', label: 'ホーム', sub: '今日のレッスン' },
-    { id: 'profile', label: 'プロフィール', sub: '記録・バッジ' },
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const resolved: ActiveTab = active ?? (location.pathname.startsWith('/profile') ? 'profile' : 'home');
+
+  const items: { id: ActiveTab; to: string; label: string; sub: string }[] = [
+    { id: 'home', to: '/home', label: 'ホーム', sub: '今日のレッスン' },
+    { id: 'profile', to: '/profile', label: 'プロフィール', sub: '記録・バッジ' },
   ];
   return (
     <div className="absolute top-[14px] right-4 z-30 flex flex-col items-end gap-2 md:hidden">
@@ -37,13 +43,13 @@ export function TabBar({ active = 'home' }: Props) {
       {open && (
         <div className="bg-white rounded-[18px] border-[1.5px] border-dl-border p-1.5 w-[220px] shadow-[0_8px_0_#F0E2CD,0_12px_32px_rgba(15,23,42,0.08)]">
           {items.map((t) => {
-            const isActive = active === t.id;
+            const isActive = resolved === t.id;
             return (
               <div
                 key={t.id}
                 onClick={() => {
                   setOpen(false);
-                  navigate(t.id);
+                  navigate(t.to, { replace: true });
                 }}
                 className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl cursor-pointer ${
                   isActive ? 'bg-[#FFEDD5]' : 'bg-transparent'

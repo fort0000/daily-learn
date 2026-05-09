@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { DL } from '../lib/dl';
-import { useNav } from '../lib/nav';
 import { Phone } from '../components/Phone';
 import { StatusBar } from '../components/StatusBar';
 import { TabBar } from '../components/TabBar';
@@ -18,7 +18,7 @@ const inputClass =
   'w-full box-border bg-white border-[1.5px] border-dl-border rounded-2xl px-3.5 py-3 text-sm font-bold text-dl-navy font-jp outline-none';
 
 export function AccountScreen() {
-  const { navigate } = useNav();
+  const navigate = useNavigate();
   const session = useSession();
   const userId = session.session?.user.id ?? null;
   const sessionEmail = session.session?.user.email ?? '';
@@ -79,7 +79,7 @@ export function AccountScreen() {
       }
 
       if (messages.length === 0) {
-        navigate('profile');
+        navigate(-1);
         return;
       }
       setInfo(messages.join(' '));
@@ -95,7 +95,7 @@ export function AccountScreen() {
       <StatusBar />
       <div className="pt-2 px-4 pb-3 pr-[76px] flex items-center gap-2.5">
         <div
-          onClick={() => navigate('profile')}
+          onClick={() => navigate(-1)}
           className="w-[38px] h-[38px] rounded-xl bg-white border-[1.5px] border-dl-border flex items-center justify-center cursor-pointer shrink-0"
         >
           <svg width="16" height="16" viewBox="0 0 16 16">

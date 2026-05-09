@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { DL } from '../lib/dl';
-import { useNav } from '../lib/nav';
 import { Phone } from '../components/Phone';
 import { StatusBar } from '../components/StatusBar';
 import { TabBar } from '../components/TabBar';
@@ -11,7 +11,7 @@ const inputClass =
   'w-full box-border bg-white border-[1.5px] border-dl-border rounded-2xl px-3.5 py-3 text-sm font-bold text-dl-navy font-jp outline-none';
 
 export function CreateScreen() {
-  const { navigate } = useNav();
+  const navigate = useNavigate();
   const [field, setField] = useState('');
   const [prerequisite, setPrerequisite] = useState('');
   const [goal, setGoal] = useState('');
@@ -26,7 +26,7 @@ export function CreateScreen() {
     setSubmitting(true);
     setError(null);
     try {
-      const { course_id } = await startCourseGeneration({
+      await startCourseGeneration({
         field: field.trim(),
         prerequisite: prerequisite.trim() || null,
         goal: goal.trim(),
@@ -34,7 +34,7 @@ export function CreateScreen() {
       // Navigate immediately. Home subscribes to the courses table via
       // Realtime; the card flips to its "ready" state on its own when the
       // background generation finishes.
-      navigate('home', { newCourseId: course_id });
+      navigate('/home');
     } catch (e) {
       console.error('[Create] startCourseGeneration failed:', e);
       setError(e instanceof Error ? e.message : 'コースの作成リクエストに失敗しました');
@@ -47,7 +47,7 @@ export function CreateScreen() {
       <StatusBar />
       <div className="pt-2 px-4 pb-3 pr-[76px] flex items-center gap-2.5">
         <div
-          onClick={() => navigate('home')}
+          onClick={() => navigate(-1)}
           className="w-[38px] h-[38px] rounded-xl bg-white border-[1.5px] border-dl-border flex items-center justify-center cursor-pointer shrink-0"
         >
           <svg width="16" height="16" viewBox="0 0 16 16">

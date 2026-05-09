@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { DL } from '../lib/dl';
-import { useNav } from '../lib/nav';
 import { Phone } from '../components/Phone';
 import { StatusBar } from '../components/StatusBar';
 import { TabBar } from '../components/TabBar';
@@ -13,8 +13,9 @@ import {
 } from '../lib/db';
 
 export function ChatScreen() {
-  const { route, navigate } = useNav();
-  const lessonId = (route.params?.lessonId as string | undefined) ?? null;
+  const navigate = useNavigate();
+  const params = useParams();
+  const lessonId = params.lessonId ?? null;
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState('');
@@ -101,7 +102,7 @@ export function ChatScreen() {
       <StatusBar />
       <div className="pt-1 px-4 pb-3 pr-[76px] flex items-center gap-3 border-b border-dl-border">
         <div
-          onClick={() => navigate('article', lessonId ? { lessonId } : undefined)}
+          onClick={() => (lessonId ? navigate(`/lessons/${lessonId}`, { replace: true }) : navigate(-1))}
           className="w-[38px] h-[38px] rounded-xl bg-white border-[1.5px] border-dl-border flex items-center justify-center cursor-pointer shrink-0"
         >
           <svg width="16" height="16" viewBox="0 0 16 16">

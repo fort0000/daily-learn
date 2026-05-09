@@ -1,7 +1,14 @@
-import { useCallback, useEffect, useRef, useState, type ComponentType, type ReactNode } from 'react';
-import { NavContext, type Route, type RouteName, type RouteParams } from './lib/nav';
+import { useEffect, useRef, type ReactNode } from 'react';
+import {
+  Navigate,
+  Outlet,
+  Route,
+  Routes,
+  useLocation,
+} from 'react-router-dom';
 import { useSession } from './lib/auth';
 import { Sidebar } from './components/Sidebar';
+import { LandingScreen } from './screens/Landing';
 import { HomeScreen } from './screens/Home';
 import { RoadmapScreen } from './screens/Roadmap';
 import { ArticleScreen } from './screens/Article';
@@ -12,86 +19,61 @@ import { CreateScreen } from './screens/Create';
 import { LoginScreen } from './screens/Login';
 import { AuthCallbackScreen } from './screens/AuthCallback';
 
-const screens: Record<RouteName, ComponentType> = {
-  home: HomeScreen,
-  roadmap: RoadmapScreen,
-  article: ArticleScreen,
-  chat: ChatScreen,
-  profile: ProfileScreen,
-  account: AccountScreen,
-  create: CreateScreen,
-};
-
-const isAuthCallback = () =>
-  typeof window !== 'undefined' && window.location.pathname === '/auth/callback';
-
 export function App() {
-  const [route, setRoute] = useState<Route>({ name: 'home' });
+  return (
+    <Shell>
+      <Routes>
+        <Route path="/" element={<FullStage><LandingScreen /></FullStage>} />
+        <Route path="/login" element={<FullStage><LoginScreen /></FullStage>} />
+        <Route path="/auth/callback" element={<FullStage><AuthCallbackScreen /></FullStage>} />
+        <Route element={<RequireAuth><AppLayout /></RequireAuth>}>
+          <Route path="/home" element={<HomeScreen />} />
+          <Route path="/roadmap" element={<RoadmapScreen />} />
+          <Route path="/lessons/:lessonId" element={<ArticleScreen />} />
+          <Route path="/lessons/:lessonId/chat" element={<ChatScreen />} />
+          <Route path="/create" element={<CreateScreen />} />
+          <Route path="/profile" element={<ProfileScreen />} />
+          <Route path="/profile/account" element={<AccountScreen />} />
+        </Route>
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </Shell>
+  );
+}
+
+function RequireAuth({ children }: { children: ReactNode }) {
+  const session = useSession();
+  const location = useLocation();
+  if (session.status === 'loading') {
+    return <FullStage><div className="w-full h-full bg-dl-bg" /></FullStage>;
+  }
+  if (session.status === 'signed-out') {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+  return <>{children}</>;
+}
+
+function AppLayout() {
+  const location = useLocation();
   const stageRef = useRef<HTMLDivElement | null>(null);
-  const navigate = useCallback((name: RouteName, params?: RouteParams) => {
-    setRoute({ name, params: params || {} });
+
+  // Reset the stage scroll on every navigation so a deep-scrolled previous
+  // page doesn't bleed into the next one.
+  useEffect(() => {
     requestAnimationFrame(() => {
       if (stageRef.current) stageRef.current.scrollTop = 0;
     });
-  }, []);
-
-  const session = useSession();
-
-  // Once signed in, drop the /auth/callback path so the URL bar is clean.
-  useEffect(() => {
-    if (
-      session.status === 'signed-in' &&
-      typeof window !== 'undefined' &&
-      window.location.pathname === '/auth/callback'
-    ) {
-      window.history.replaceState({}, document.title, '/');
-    }
-  }, [session.status]);
-
-  // Signed-in always wins — even if the URL is still /auth/callback for a beat.
-  if (session.status === 'signed-in') {
-    const Screen = screens[route.name];
-    return (
-      <NavContext.Provider value={{ route, navigate }}>
-        <Shell>
-          <Sidebar />
-          <div ref={stageRef} className="flex-1 w-full h-screen bg-dl-bg relative overflow-hidden">
-            <div key={route.name} className="w-full h-full animate-dlfade">
-              <Screen />
-            </div>
-          </div>
-        </Shell>
-      </NavContext.Provider>
-    );
-  }
-
-  // No session yet but on the OAuth/email callback path → run the handler.
-  if (isAuthCallback()) {
-    return (
-      <Shell>
-        <FullStage>
-          <AuthCallbackScreen />
-        </FullStage>
-      </Shell>
-    );
-  }
-
-  if (session.status === 'loading') {
-    return (
-      <Shell>
-        <FullStage>
-          <div className="w-full h-full bg-dl-bg" />
-        </FullStage>
-      </Shell>
-    );
-  }
+  }, [location.pathname]);
 
   return (
-    <Shell>
-      <FullStage>
-        <LoginScreen />
-      </FullStage>
-    </Shell>
+    <>
+      <Sidebar />
+      <div ref={stageRef} className="flex-1 w-full h-screen bg-dl-bg relative overflow-hidden">
+        <div key={location.pathname} className="w-full h-full animate-dlfade">
+          <Outlet />
+        </div>
+      </div>
+    </>
   );
 }
 

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { DL } from '../lib/dl';
-import { useNav } from '../lib/nav';
 import { Phone } from '../components/Phone';
 import { StatusBar } from '../components/StatusBar';
 import { TabBar } from '../components/TabBar';
@@ -16,8 +16,9 @@ import {
 import { isLessonBody, type LessonBody } from '../lib/lessonBody';
 
 export function ArticleScreen() {
-  const { route, navigate } = useNav();
-  const lessonId = (route.params?.lessonId as string | undefined) ?? null;
+  const navigate = useNavigate();
+  const params = useParams();
+  const lessonId = params.lessonId ?? null;
 
   const [lesson, setLesson] = useState<Lesson | null>(null);
   const [loading, setLoading] = useState(true);
@@ -82,7 +83,7 @@ export function ArticleScreen() {
       await markLessonComplete(lesson.id);
       // Fire-and-forget — server-side checks frontier conditions itself.
       void requestLessonPrefetchNext(lesson.id);
-      navigate('home');
+      navigate('/home');
     } catch (e) {
       console.error('[Article] markLessonComplete failed:', e);
       setError(e instanceof Error ? e.message : '完了の記録に失敗しました');
@@ -103,7 +104,7 @@ export function ArticleScreen() {
       </div>
       <div className="pt-2 px-4 pb-3 pr-[76px] flex items-center gap-2.5">
         <div
-          onClick={() => navigate('home')}
+          onClick={() => navigate(-1)}
           className="w-[38px] h-[38px] rounded-xl bg-white border-[1.5px] border-dl-border flex items-center justify-center cursor-pointer shrink-0"
         >
           <svg width="16" height="16" viewBox="0 0 16 16">
@@ -131,7 +132,7 @@ export function ArticleScreen() {
         {loading ? (
           <Skeleton />
         ) : !lesson ? (
-          <NotFound onBack={() => navigate('home')} />
+          <NotFound onBack={() => navigate('/home')} />
         ) : (
           <ArticleBody lesson={lesson} body={body} generating={generating} />
         )}
@@ -145,7 +146,7 @@ export function ArticleScreen() {
         {lesson && (
           <div className="mt-7">
             {lesson.completed_at ? (
-              <PushButton color={DL.slate} shadow="#1f2a3b" fontSize={16} onClick={() => navigate('home')}>
+              <PushButton color={DL.slate} shadow="#1f2a3b" fontSize={16} onClick={() => navigate('/home')}>
                 ✓ 完了済み — ホームへ
               </PushButton>
             ) : (
@@ -165,7 +166,7 @@ export function ArticleScreen() {
       </div>
 
       <div
-        onClick={() => lesson && navigate('chat', { lessonId: lesson.id })}
+        onClick={() => lesson && navigate(`/lessons/${lesson.id}/chat`, { replace: true })}
         title="AIアシスタントに質問"
         className={`absolute bottom-6 right-[18px] z-25 w-[58px] h-[58px] rounded-full bg-dl-mint flex items-center justify-center shadow-[0_5px_0_#0F7A38,0_10px_24px_rgba(15,23,42,0.18)] ${
           lesson ? 'cursor-pointer' : 'opacity-50 cursor-not-allowed pointer-events-none'

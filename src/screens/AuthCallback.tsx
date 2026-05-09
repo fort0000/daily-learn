@@ -1,13 +1,17 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { DL } from '../lib/dl';
 import { Phone } from '../components/Phone';
 import { StatusBar } from '../components/StatusBar';
 import { AppIcon } from '../components/AppIcon';
+import { useSession } from '../lib/auth';
 import { supabase } from '../lib/supabase';
 
 const STUCK_TIMEOUT_MS = 10_000;
 
 export function AuthCallbackScreen() {
+  const navigate = useNavigate();
+  const session = useSession();
   const [stuck, setStuck] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -36,9 +40,16 @@ export function AuthCallbackScreen() {
     return () => clearTimeout(timer);
   }, []);
 
+  // Once the session lands, drop the /auth/callback path so it doesn't sit in
+  // history (browser back from /home shouldn't bounce here).
+  useEffect(() => {
+    if (session.status === 'signed-in') {
+      navigate('/home', { replace: true });
+    }
+  }, [session.status, navigate]);
+
   const restart = () => {
-    window.history.replaceState({}, document.title, '/');
-    window.location.reload();
+    navigate('/login', { replace: true });
   };
 
   return (

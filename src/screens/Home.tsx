@@ -8,8 +8,8 @@ import {
   type TouchEvent as RTouchEvent,
   type MouseEvent as RMouseEvent,
 } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { DL } from '../lib/dl';
-import { useNav } from '../lib/nav';
 import { Phone } from '../components/Phone';
 import { StatusBar } from '../components/StatusBar';
 import { TabBar } from '../components/TabBar';
@@ -208,11 +208,11 @@ export function HomeScreen() {
 }
 
 function NewCourseCTA() {
-  const { navigate } = useNav();
+  const navigate = useNavigate();
   return (
     <div className="pt-3.5 px-5">
       <button
-        onClick={() => navigate('create')}
+        onClick={() => navigate('/create')}
         className="w-full bg-white border-2 border-dashed border-dl-primary rounded-[20px] px-4 py-3.5 flex items-center gap-3 cursor-pointer font-jp text-left"
       >
         <div className="w-11 h-11 rounded-[14px] bg-dl-primary flex items-center justify-center shadow-[0_3px_0_#C8431A] shrink-0">
@@ -408,7 +408,7 @@ function ActiveCard({
   lesson: Lesson;
   wasDragging: () => boolean;
 }) {
-  const { navigate } = useNav();
+  const navigate = useNavigate();
   const { course, palette, locked } = card;
 
   return (
@@ -449,7 +449,7 @@ function ActiveCard({
             shadow={palette.shadow}
             fontSize={16}
             onClick={() => {
-              if (!wasDragging()) navigate('article', { lessonId: lesson.id });
+              if (!wasDragging()) navigate(`/lessons/${lesson.id}`);
             }}
           >
             今日の学びを始める →
@@ -458,7 +458,7 @@ function ActiveCard({
       )}
       <div
         onClick={() => {
-          if (!wasDragging()) navigate('roadmap', { courseId: course.id });
+          if (!wasDragging()) navigate(`/roadmap?courseId=${course.id}`);
         }}
         className="mt-3.5 flex items-center justify-between pt-3 border-t border-dashed border-dl-border cursor-pointer"
       >

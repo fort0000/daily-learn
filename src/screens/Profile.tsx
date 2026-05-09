@@ -1,6 +1,6 @@
 import { Children, Fragment, useEffect, useState, type ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { DL } from '../lib/dl';
-import { useNav } from '../lib/nav';
 import { Phone } from '../components/Phone';
 import { StatusBar } from '../components/StatusBar';
 import { TabBar } from '../components/TabBar';
@@ -62,7 +62,7 @@ type Stat = { label: string; value: string; unit: string; color: string; bg: str
 type Badge = { icon: string; label: string; unlocked: boolean; color?: string };
 
 export function ProfileScreen() {
-  const { navigate } = useNav();
+  const navigate = useNavigate();
   const session = useSession();
   const userId = session.session?.user.id ?? null;
   const { profile, error: profileError } = useProfile(userId);
@@ -203,7 +203,7 @@ export function ProfileScreen() {
         </div>
 
         <SettingsSection title="アカウント">
-          <SettingsRow label="プロフィール" value="名前・メール・パスワード" onClick={() => navigate('account')} />
+          <SettingsRow label="プロフィール" value="名前・メール・パスワード" onClick={() => navigate('/profile/account')} />
         </SettingsSection>
 
         <SettingsSection title="サブスクリプション">

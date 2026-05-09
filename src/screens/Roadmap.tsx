@@ -226,11 +226,16 @@ function SectionHeader({ stage }: { stage: Stage }) {
 
 type NodeProps = { cell: Cell; idx: number; pulse?: boolean };
 
+// The winding-path positions that have always defined the snake-style layout
+// (left offset within an ~360px-wide phone). Each row gets one node + a text
+// block on whichever side has more empty space.
+const PATH_POSITIONS = [110, 160, 200, 230, 240, 230, 200, 160, 110, 60, 30, 20, 30, 60];
+const PATH_CENTER_X = 180; // approx phone-content midline
+
 function Node({ cell, idx, pulse }: NodeProps) {
   const { navigate } = useNav();
   const { day, state, lesson } = cell;
-  const positions = [110, 160, 200, 230, 240, 230, 200, 160, 110, 60, 30, 20, 30, 60];
-  const left = positions[idx % positions.length];
+  const left = PATH_POSITIONS[idx % PATH_POSITIONS.length]!;
 
   const colors: Record<DayState, { bg: string; sh: string; icon: 'check' | 'star' | 'lock' }> = {
     done: { bg: DL.mint, sh: '#0F7A38', icon: 'check' },
@@ -239,19 +244,56 @@ function Node({ cell, idx, pulse }: NodeProps) {
   };
   const c = colors[state];
   const size = state === 'current' ? 56 : 44;
-  const showLabel = state !== 'current' && (day % 10 === 0 || day === 11 || day === 1);
-  // Future cells — and any cell missing a backing lesson row — are not navigable.
   const navigable = state !== 'future' && lesson !== null;
 
+  // Put the text block on the side opposite to where the node sits, so the
+  // snake's empty side carries the lesson info.
+  const nodeCenter = left + size / 2;
+  const textOnLeft = nodeCenter > PATH_CENTER_X;
+  const textStyle: React.CSSProperties = textOnLeft
+    ? { left: 14, right: `calc(100% - ${left - 8}px)`, textAlign: 'right' }
+    : { left: left + size + 10, right: 14, textAlign: 'left' };
+
+  const titleColor =
+    state === 'done'
+      ? 'text-dl-slate'
+      : state === 'current'
+      ? 'text-dl-navy'
+      : 'text-dl-slate-light';
+
   return (
-    <div className="relative h-[60px]">
+    <div
+      onClick={() => {
+        if (navigable && lesson) navigate('article', { lessonId: lesson.id });
+      }}
+      className={`relative h-[72px] ${navigable ? 'cursor-pointer' : 'cursor-not-allowed'}`}
+    >
+      {/* Lesson title block on the opposite side of the node */}
+      {lesson ? (
+        <div className="absolute top-2" style={textStyle}>
+          <div
+            className={`text-[10px] font-extrabold tracking-wider opacity-75 ${titleColor}`}
+          >
+            DAY {day}
+          </div>
+          <div
+            className={`mt-0.5 text-[13px] font-black font-jp leading-[1.3] line-clamp-2 ${titleColor}`}
+          >
+            {lesson.title}
+          </div>
+        </div>
+      ) : (
+        <div className="absolute top-2" style={textStyle}>
+          <div className="text-[10px] font-extrabold tracking-wider text-dl-slate-light opacity-60">
+            DAY {day}
+          </div>
+          <div className="mt-1 h-3 w-2/3 bg-[#F0E2CD] rounded-full opacity-60" />
+        </div>
+      )}
+
+      {/* The actual node circle, kept at its original winding position */}
       <div
-        onClick={() => {
-          if (navigable && lesson) navigate('article', { lessonId: lesson.id });
-        }}
-        className={`absolute top-1 ${navigable ? 'cursor-pointer' : 'cursor-not-allowed'} ${
-          pulse ? 'animate-pulse' : ''
-        }`}
+        className={`absolute top-1 ${pulse ? 'animate-pulse' : ''}`}
         style={{ left, width: size, height: size }}
       >
         {state === 'current' && (
@@ -297,16 +339,6 @@ function Node({ cell, idx, pulse }: NodeProps) {
             </svg>
           )}
         </div>
-        {showLabel && (
-          <div
-            className={`absolute left-1/2 -translate-x-1/2 text-[9px] font-extrabold font-jp whitespace-nowrap ${
-              state === 'future' ? 'text-dl-slate-light' : 'text-dl-mint-dark'
-            }`}
-            style={{ top: size + 2 }}
-          >
-            Day {day}
-          </div>
-        )}
       </div>
     </div>
   );

@@ -88,10 +88,6 @@ export function ProfileScreen() {
 
   const displayName = resolveDisplayName(profile, session.session) ?? '...';
   const planLabel = profile?.plan === 'paid' ? '有料プラン' : '無料プラン';
-  const planHint =
-    profile?.plan === 'paid'
-      ? 'すべての機能を利用可能'
-      : '1 コース / Day 1〜10 / AIアシスタントは有料プラン';
 
   const stats: Stat[] = [
     { label: '最長連続', value: String(streak.longest), unit: '日', color: DL.primary, bg: '#FFEDD5' },
@@ -219,7 +215,7 @@ export function ProfileScreen() {
             <div className="px-2.5 py-1 rounded-full text-[11px] font-black font-jp text-[#78350F] bg-gradient-to-r from-dl-yellow to-[#F59E0B]">
               {planLabel}
             </div>
-            <div className="flex-1 text-[11px] font-bold text-dl-slate font-jp">{planHint}</div>
+            <div className="flex-1" />
             <div className="text-xs font-black text-dl-primary font-jp">変更 →</div>
           </div>
         </SettingsSection>

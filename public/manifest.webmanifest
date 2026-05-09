@@ -3,7 +3,7 @@
   "short_name": "DailyLearn",
   "description": "30日間で学びを習慣化する、AIコーチ付き学習アプリ",
   "lang": "ja",
-  "start_url": "/",
+  "start_url": "/home",
   "display": "standalone",
   "background_color": "#FFFBF5",
   "theme_color": "#FF7A45",

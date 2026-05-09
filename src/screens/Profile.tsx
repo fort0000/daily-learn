@@ -7,7 +7,7 @@ import { TabBar } from '../components/TabBar';
 import { AppIcon } from '../components/AppIcon';
 import { Flame } from '../components/Flame';
 import { resolveDisplayName, signOut, useProfile, useSession } from '../lib/auth';
-import { fetchTotalCompleted, getStreak, startBillingPortal } from '../lib/db';
+import { fetchTotalCompleted, getStreak } from '../lib/db';
 
 function SettingsSection({ title, children }: { title: string; children: ReactNode }) {
   const arr = Children.toArray(children);
@@ -70,7 +70,6 @@ export function ProfileScreen() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [streak, setStreak] = useState({ current: 0, longest: 0 });
   const [totalCompleted, setTotalCompleted] = useState(0);
-  const [openingPortal, setOpeningPortal] = useState(false);
 
   useEffect(() => {
     if (!userId) return;
@@ -101,22 +100,6 @@ export function ProfileScreen() {
     { icon: '💎', label: '30日達成', unlocked: false },
     { icon: '🏆', label: '100日連続', unlocked: false },
   ];
-
-  const handleSubscriptionTap = async () => {
-    if (profile?.plan === 'paid') {
-      if (openingPortal) return;
-      setOpeningPortal(true);
-      try {
-        const { url } = await startBillingPortal();
-        window.location.href = url;
-      } catch (e) {
-        console.error('[Profile] portal failed:', e);
-        setOpeningPortal(false);
-      }
-      return;
-    }
-    navigate('/upgrade');
-  };
 
   const handleSignOut = async () => {
     if (signingOut) return;
@@ -224,17 +207,15 @@ export function ProfileScreen() {
 
         <SettingsSection title="サブスクリプション">
           <div
-            className={`px-3.5 py-3 flex items-center gap-3 cursor-pointer ${
-              openingPortal ? 'opacity-60 pointer-events-none' : ''
-            }`}
-            onClick={handleSubscriptionTap}
+            className="px-3.5 py-3 flex items-center gap-3 cursor-pointer"
+            onClick={() => navigate('/upgrade')}
           >
             <div className="px-2.5 py-1 rounded-full text-[11px] font-black font-jp text-[#78350F] bg-gradient-to-r from-dl-yellow to-[#F59E0B]">
               {planLabel}
             </div>
             <div className="flex-1" />
             <div className="text-xs font-black text-dl-primary font-jp">
-              {profile?.plan === 'paid' ? (openingPortal ? '...' : '管理する →') : '変更 →'}
+              {profile?.plan === 'paid' ? '管理する →' : '変更 →'}
             </div>
           </div>
         </SettingsSection>

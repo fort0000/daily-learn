@@ -572,7 +572,7 @@ function ChangeCadenceCTA({
   const note =
     target === 'yearly'
       ? '差額を即時計算 · 2ヶ月分お得になります'
-      : '次回更新日に月額へ切り替わります';
+      : '残期間のクレジットを今後の月額に自動充当';
   return (
     <>
       <div className={`mt-3.5 ${loading ? 'opacity-60 pointer-events-none' : ''}`}>

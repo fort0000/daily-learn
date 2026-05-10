@@ -273,7 +273,7 @@ export function ArticleScreen() {
           else openChat();
         }}
         title={chatVisible ? 'レッスンに戻る' : 'AIアシスタントに質問'}
-        className={`absolute bottom-[92px] right-[18px] z-[60] w-[58px] h-[58px] rounded-full flex items-center justify-center ${
+        className={`absolute bottom-6 right-[18px] z-[60] w-[58px] h-[58px] rounded-full flex items-center justify-center ${
           lesson ? 'cursor-pointer' : 'opacity-50 cursor-not-allowed pointer-events-none'
         }`}
         style={{
@@ -281,8 +281,10 @@ export function ArticleScreen() {
           boxShadow: chatVisible
             ? '0 4px 0 #1E293B, 0 8px 20px rgba(15,23,42,0.35)'
             : '0 5px 0 #0F7A38, 0 10px 24px rgba(15,23,42,0.18)',
+          // Lift the button while chat is open so it clears the input/send row.
+          transform: chatVisible ? 'translateY(-68px)' : 'translateY(0)',
           transition:
-            'background 320ms ease, box-shadow 320ms ease, transform 220ms cubic-bezier(.34,1.56,.64,1)',
+            'background 320ms ease, box-shadow 320ms ease, transform 320ms cubic-bezier(.34,1.56,.64,1)',
           animation: !chatMounted && lesson ? 'dlFabBob 2.4s ease-in-out infinite' : 'none',
         }}
       >
@@ -338,11 +340,11 @@ export function ArticleScreen() {
           className="absolute inset-0 z-[55]"
           style={{
             clipPath: chatVisible
-              ? 'circle(140% at calc(100% - 47px) calc(100% - 121px))'
-              : 'circle(0px at calc(100% - 47px) calc(100% - 121px))',
+              ? 'circle(140% at calc(100% - 47px) calc(100% - 53px))'
+              : 'circle(0px at calc(100% - 47px) calc(100% - 53px))',
             WebkitClipPath: chatVisible
-              ? 'circle(140% at calc(100% - 47px) calc(100% - 121px))'
-              : 'circle(0px at calc(100% - 47px) calc(100% - 121px))',
+              ? 'circle(140% at calc(100% - 47px) calc(100% - 53px))'
+              : 'circle(0px at calc(100% - 47px) calc(100% - 53px))',
             transition:
               'clip-path 460ms cubic-bezier(.4,0,.2,1), -webkit-clip-path 460ms cubic-bezier(.4,0,.2,1)',
             pointerEvents: chatVisible ? 'auto' : 'none',

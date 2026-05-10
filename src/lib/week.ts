@@ -73,6 +73,13 @@ export function bucketCompletedByJstDate(
   return out;
 }
 
+/** Dev-only escape hatch: unlimited lessons per day when served from localhost. */
+function isLocalhost(): boolean {
+  if (typeof window === 'undefined') return false;
+  const host = window.location.hostname;
+  return host === 'localhost' || host === '127.0.0.1' || host === '[::1]';
+}
+
 /**
  * Pacing rule: only one lesson per JST day. If the user already completed any
  * lesson today, the next-in-sequence lesson is held until JST midnight rolls
@@ -84,6 +91,7 @@ export function bucketCompletedByJstDate(
 export function nextLockedDay(
   lessons: { day: number; completed_at: string | null }[],
 ): number | null {
+  if (isLocalhost()) return null;
   if (lessons.length === 0) return null;
   const completed = lessons.filter((l) => l.completed_at);
   if (completed.length === 0) return null;

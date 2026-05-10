@@ -555,9 +555,12 @@ export function CompleteModal({
                       '0 3px 0 #0F7A38, 0 0 16px rgba(34,197,94,0.6)',
                     animation:
                       'dlBadgeSlam 520ms cubic-bezier(.2,.8,.3,1.2) both',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 4,
                   }}
                 >
-                  +1 🔥
+                  +1 <Flame size={14} />
                 </div>
               )}
             </div>

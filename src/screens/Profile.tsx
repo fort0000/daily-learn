@@ -136,9 +136,6 @@ export function ProfileScreen() {
                 <div className="text-4xl font-black text-dl-fire leading-none tabular-nums">{streak.current}</div>
                 <div className="text-sm font-extrabold text-dl-slate font-jp">日連続</div>
               </div>
-              <div className="text-[11px] font-bold text-dl-slate font-jp mt-1">
-                最長記録 <span className="text-dl-navy font-black">{streak.longest}日</span>
-              </div>
             </div>
           </div>
         </div>
@@ -186,9 +183,8 @@ export function ProfileScreen() {
                   {b.unlocked ? b.icon : '🔒'}
                 </div>
                 <div
-                  className={`text-[9px] font-extrabold font-jp text-center ${
-                    b.unlocked ? 'text-dl-navy' : 'text-dl-slate-light'
-                  }`}
+                  className={`text-[9px] font-extrabold font-jp text-center ${b.unlocked ? 'text-dl-navy' : 'text-dl-slate-light'
+                    }`}
                 >
                   {b.label}
                 </div>
@@ -211,13 +207,13 @@ export function ProfileScreen() {
               style={
                 profile?.plan === 'paid'
                   ? {
-                      color: '#FFD7B5',
-                      backgroundImage: [
-                        'radial-gradient(circle at 100% 0%, rgba(255,122,69,0.55) 0%, transparent 70%)',
-                        'linear-gradient(135deg, #1B2540 0%, #0F172A 55%, #2A1810 100%)',
-                      ].join(', '),
-                      border: `1px solid ${DL.primary}`,
-                    }
+                    color: '#FFD7B5',
+                    backgroundImage: [
+                      'radial-gradient(circle at 100% 0%, rgba(255,122,69,0.55) 0%, transparent 70%)',
+                      'linear-gradient(135deg, #1B2540 0%, #0F172A 55%, #2A1810 100%)',
+                    ].join(', '),
+                    border: `1px solid ${DL.primary}`,
+                  }
                   : { color: '#78350F', background: 'linear-gradient(90deg, #FACC15 0%, #F59E0B 100%)' }
               }
             >

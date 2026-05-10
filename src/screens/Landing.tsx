@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useSession } from '../lib/auth';
 import './Landing.css';
+
+const ROUTE_FADE_MS = 240;
 
 const FLAME_SRC = '/flame.png';
 
@@ -34,6 +36,7 @@ const FAQS: { q: string; a: string }[] = [
 
 export function LandingScreen() {
   const session = useSession();
+  const navigate = useNavigate();
   const isSignedIn = session.status === 'signed-in';
   const startHref = isSignedIn ? '/home' : '/login';
 
@@ -42,6 +45,16 @@ export function LandingScreen() {
   const streakRef = useRef<HTMLDivElement | null>(null);
   const [openFaq, setOpenFaq] = useState<number>(0);
   const [streakValue, setStreakValue] = useState(0);
+  const [leaving, setLeaving] = useState(false);
+
+  // Run the LP fade-out animation, then navigate. Used by anything in the LP
+  // that takes the user to a different route (header CTA, ログイン, in-page
+  // CTAs) so route swaps don't feel like an instant flash.
+  const fadeNavigate = (to: string) => {
+    if (leaving) return;
+    setLeaving(true);
+    window.setTimeout(() => navigate(to), ROUTE_FADE_MS);
+  };
 
   // Scroll reveal + sticky header shadow
   useEffect(() => {
@@ -174,9 +187,14 @@ export function LandingScreen() {
   }, []);
 
   return (
-    <div ref={rootRef} className="dl-lp">
-      <Header refEl={headerRef} startHref={startHref} isSignedIn={isSignedIn} />
-      <Hero startHref={startHref} isSignedIn={isSignedIn} />
+    <div ref={rootRef} className={`dl-lp${leaving ? ' leaving' : ''}`}>
+      <Header
+        refEl={headerRef}
+        startHref={startHref}
+        isSignedIn={isSignedIn}
+        onFadeNavigate={fadeNavigate}
+      />
+      <Hero startHref={startHref} isSignedIn={isSignedIn} onFadeNavigate={fadeNavigate} />
       <Problem />
       <HowItWorks />
       <FeatureA />
@@ -184,9 +202,9 @@ export function LandingScreen() {
       <FeatureC />
       <FeatureD streakValue={streakValue} streakRef={streakRef} />
       <Tags />
-      <Pricing startHref={startHref} />
+      <Pricing startHref={startHref} onFadeNavigate={fadeNavigate} />
       <Faq openFaq={openFaq} setOpenFaq={setOpenFaq} />
-      <FinalCta startHref={startHref} />
+      <FinalCta startHref={startHref} onFadeNavigate={fadeNavigate} />
       <Footer />
     </div>
   );
@@ -199,15 +217,35 @@ function Header({
   refEl,
   startHref,
   isSignedIn,
+  onFadeNavigate,
 }: {
   refEl: React.MutableRefObject<HTMLElement | null>;
   startHref: string;
   isSignedIn: boolean;
+  onFadeNavigate: (to: string) => void;
 }) {
+  const handleAnchor = (e: React.MouseEvent<HTMLAnchorElement>, hash: string) => {
+    const el = document.querySelector(hash) as HTMLElement | null;
+    if (!el) return;
+    e.preventDefault();
+    const headerH = 72;
+    const top = el.getBoundingClientRect().top + window.scrollY - headerH;
+    window.scrollTo({ top, behavior: 'smooth' });
+    window.history.replaceState(null, '', hash);
+  };
+  const scrollToTop = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    e.preventDefault();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.history.replaceState(null, '', window.location.pathname);
+  };
+  const handleRoute = (e: React.MouseEvent<HTMLAnchorElement>, to: string) => {
+    e.preventDefault();
+    onFadeNavigate(to);
+  };
   return (
     <header ref={refEl} className="site-header">
       <div className="container inner">
-        <a href="#" className="logo" onClick={(e) => e.preventDefault()}>
+        <a href="#" className="logo" onClick={scrollToTop}>
           <span className="flame">
             <img src={FLAME_SRC} alt="" />
           </span>
@@ -216,13 +254,19 @@ function Header({
           </span>
         </a>
         <nav className="header-nav">
-          <a className="text-link" href="#features">機能</a>
-          <a className="text-link" href="#pricing">料金</a>
-          <a className="text-link" href="#faq">FAQ</a>
+          <a className="text-link" href="#features" onClick={(e) => handleAnchor(e, '#features')}>機能</a>
+          <a className="text-link" href="#pricing" onClick={(e) => handleAnchor(e, '#pricing')}>料金</a>
+          <a className="text-link" href="#faq" onClick={(e) => handleAnchor(e, '#faq')}>FAQ</a>
           {!isSignedIn && (
-            <Link className="text-link" to="/login">ログイン</Link>
+            <Link className="text-link" to="/login" onClick={(e) => handleRoute(e, '/login')}>
+              ログイン
+            </Link>
           )}
-          <Link className="btn btn-primary btn-sm" to={startHref}>
+          <Link
+            className="btn btn-primary btn-sm"
+            to={startHref}
+            onClick={(e) => handleRoute(e, startHref)}
+          >
             <span className="jp">{isSignedIn ? 'アプリを開く' : '無料で始める'}</span>
           </Link>
         </nav>
@@ -234,7 +278,15 @@ function Header({
 // ----------------------------------------------------------------
 // Hero
 // ----------------------------------------------------------------
-function Hero({ startHref, isSignedIn }: { startHref: string; isSignedIn: boolean }) {
+function Hero({
+  startHref,
+  isSignedIn,
+  onFadeNavigate,
+}: {
+  startHref: string;
+  isSignedIn: boolean;
+  onFadeNavigate: (to: string) => void;
+}) {
   return (
     <section className="hero">
       <div className="bg-blobs">
@@ -261,13 +313,17 @@ function Hero({ startHref, isSignedIn }: { startHref: string; isSignedIn: boolea
             </p>
 
             <div className="cta-row">
-              <Link className="btn btn-primary btn-lg" to={startHref}>
+              <Link
+                className="btn btn-primary btn-lg"
+                to={startHref}
+                onClick={(e) => {
+                  e.preventDefault();
+                  onFadeNavigate(startHref);
+                }}
+              >
                 <span className="jp">{isSignedIn ? 'アプリを開く' : '学習を始める'}</span>
                 <span aria-hidden="true">→</span>
               </Link>
-              <a className="btn btn-outline btn-lg" href="#features">
-                <span className="jp">アプリの中を見る</span>
-              </a>
             </div>
 
             <div className="badges">
@@ -317,19 +373,26 @@ function Hero({ startHref, isSignedIn }: { startHref: string; isSignedIn: boolea
                 <PhoneStatus />
                 <div className="phone-home">
                   <div className="phone-top">
-                    <div className="date">
-                      <strong>5月9日(土)</strong>
-                      <br />
-                      おはよう、Akiさん
-                    </div>
-                    <span className="streak-pill">
-                      <img className="flame-icon" src={FLAME_SRC} alt="" /> 12日連続
+                    <div className="header-date">5月10日(土)</div>
+                    <span className="hamburger" aria-hidden="true">
+                      <span /><span /><span />
+                    </span>
+                  </div>
+                  <div className="streak-row">
+                    <span className="streak-pill-app">
+                      <img className="streak-pill-flame" src="/icon-192.png" alt="" />
+                      <span className="streak-num-pill">12</span>
+                      <span className="streak-pill-jp">日連続</span>
                     </span>
                   </div>
 
-                  <div className="course-card">
+                  <div className="course-card course-card-app">
+                    <span className="card-blob" aria-hidden="true" />
                     <div className="row-top">
-                      <span className="day-pill">DAY 7 / 30</span>
+                      <span className="day-chip">
+                        <span className="dot" />
+                        DAY 7 / 30
+                      </span>
                       <span className="min-pill">⏱ 約10分</span>
                     </div>
                     <div className="course-name">副業で月3万円コース</div>
@@ -341,24 +404,54 @@ function Hero({ startHref, isSignedIn }: { startHref: string; isSignedIn: boolea
                     <div className="summary">
                       「いくらかかったか」より「相手にどう価値があるか」。今日は値付けの基本を10分で。
                     </div>
-                    <div className="mini-btn">
+                    <div className="push-mini-btn">
                       今日の学びを始める <span aria-hidden="true">→</span>
+                    </div>
+                    <div className="card-footer-row">
+                      <span className="footer-chip" aria-hidden="true">
+                        <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+                          <path d="M3 4 Q8 4 8 8 Q8 12 13 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none" />
+                          <circle cx="3" cy="4" r="1.6" fill="currentColor" />
+                          <circle cx="13" cy="12" r="1.6" fill="currentColor" />
+                        </svg>
+                      </span>
+                      <span className="footer-text">このコースのロードマップ</span>
+                      <svg className="chev-r" width="11" height="11" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                        <path d="M7 4 L13 10 L7 16" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
                     </div>
                   </div>
 
-                  <div className="week-tracker">
+                  <div className="week-tracker week-tracker-app">
                     <div className="label">
-                      <span>今週のレッスン</span>
-                      <span>5 / 7</span>
+                      <span>今週の学習</span>
+                      <span className="done-count">5 / 7 日</span>
                     </div>
-                    <div className="days">
-                      <span className="day-circle done">月</span>
-                      <span className="day-circle done">火</span>
-                      <span className="day-circle done">水</span>
-                      <span className="day-circle today">木</span>
-                      <span className="day-circle">金</span>
-                      <span className="day-circle">土</span>
-                      <span className="day-circle">日</span>
+                    <div className="days days-cols">
+                      {[
+                        { l: '月', s: 'done' },
+                        { l: '火', s: 'done' },
+                        { l: '水', s: 'done' },
+                        { l: '木', s: 'today' },
+                        { l: '金', s: '' },
+                        { l: '土', s: '' },
+                        { l: '日', s: '' },
+                      ].map((d, i) => (
+                        <div key={i} className="day-col">
+                          <div className={`day-circle-app ${d.s}`}>
+                            {d.s === 'done' ? (
+                              <svg width="14" height="14" viewBox="0 0 16 16">
+                                <path d="M3 8 L7 12 L13 4" stroke="#fff" strokeWidth="2.6" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                              </svg>
+                            ) : d.s === 'today' ? (
+                              '今'
+                            ) : (
+                              ''
+                            )}
+                          </div>
+                          <div className={`day-name ${d.s === 'today' ? 'today' : ''}`}>{d.l}</div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>
@@ -526,7 +619,7 @@ function HowItWorks() {
           <h2>
             <span className="marker-y">3ステップ</span>で、
             <br />
-            明日から学習が始まる。
+            今日学習が始まる。
           </h2>
         </div>
 
@@ -630,24 +723,85 @@ function FeatureA() {
             <div className="phone phone-tilt-l">
               <div className="phone-screen">
                 <PhoneStatus minimal />
-                <div className="full-roadmap">
-                  <h5>
-                    副業で月3万円コース <span className="small">7 / 30</span>
-                  </h5>
-                  <div className="roadmap-30 roadmap-wave">
-                    {Array.from({ length: 6 }).map((_, i) => (
-                      <span key={`d${i}`} className="cell done">✓</span>
+                <div className="full-roadmap-app">
+                  <div className="rm-head">
+                    <div className="back-btn" aria-hidden="true">
+                      <svg width="12" height="12" viewBox="0 0 16 16">
+                        <path d="M10 3 L4 8 L10 13" stroke="#0F172A" strokeWidth="2.4" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </div>
+                    <div className="rm-titles">
+                      <div className="kicker">30日コース</div>
+                      <div className="course-title">副業で月3万円コース</div>
+                    </div>
+                  </div>
+                  <div className="rm-progress">
+                    <div className="row">
+                      <span>達成度</span>
+                      <span className="pct">23% <span className="frac">(7/30日)</span></span>
+                    </div>
+                    <div className="bar">
+                      <div className="fill" style={{ width: '23%' }} />
+                    </div>
+                  </div>
+                  <div className="rm-body">
+                    <div className="stage-pill stage-basics">
+                      <span className="sub">BASICS</span>
+                      <span className="lbl">基礎</span>
+                      <span className="rng">Day 1 〜 10</span>
+                    </div>
+                    {[
+                      { d: 1, s: 'done', x: 110, t: '副業の全体像をつかむ' },
+                      { d: 2, s: 'done', x: 160, t: '自分の強みを言語化する' },
+                      { d: 3, s: 'done', x: 200, t: '提供サービスを書き出す' },
+                      { d: 4, s: 'done', x: 220, t: '最初のターゲットを決める' },
+                      { d: 5, s: 'done', x: 200, t: '競合をリサーチする' },
+                      { d: 6, s: 'done', x: 160, t: '最小サービスを設計する' },
+                      { d: 7, s: 'current', x: 110, t: '価値で決める価格' },
+                      { d: 8, s: 'future', x: 60, t: '集客の入り口を1つ選ぶ' },
+                      { d: 9, s: 'future', x: 30, t: 'プロフィールを整える' },
+                    ].map((n) => (
+                      <div key={n.d} className={`rm-row ${n.s}`}>
+                        <div
+                          className={`rm-text ${n.x > 130 ? 'left' : 'right'}`}
+                          style={
+                            n.x > 130
+                              ? { right: `calc(100% - ${n.x - 8}px)`, left: 10, textAlign: 'right' }
+                              : { left: n.x + 38, right: 10, textAlign: 'left' }
+                          }
+                        >
+                          <div className="rm-day">DAY {n.d}</div>
+                          <div className="rm-title">{n.t}</div>
+                        </div>
+                        <div
+                          className={`rm-node ${n.s}`}
+                          style={{ left: n.x }}
+                        >
+                          {n.s === 'done' && (
+                            <svg width="14" height="14" viewBox="0 0 28 28">
+                              <path d="M6 14 L12 20 L22 8" stroke="#fff" strokeWidth="4" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                          )}
+                          {n.s === 'current' && (
+                            <div className="cur-label">
+                              <div>D{n.d}</div>
+                              <div className="sub-cur">進行中</div>
+                            </div>
+                          )}
+                          {n.s === 'future' && (
+                            <svg width="11" height="11" viewBox="0 0 22 22" fill="none">
+                              <rect x="5" y="10" width="12" height="9" rx="2" fill="#A89F88" />
+                              <path d="M7 10 V7 a4 4 0 0 1 8 0 V10" stroke="#A89F88" strokeWidth="2.4" fill="none" strokeLinecap="round" />
+                            </svg>
+                          )}
+                        </div>
+                      </div>
                     ))}
-                    <span className="cell today">7</span>
-                    {Array.from({ length: 22 }).map((_, i) => (
-                      <span key={`n${i}`} className="cell">{8 + i}</span>
-                    ))}
-                    <span
-                      className="cell"
-                      style={{ background: '#FFEDD5', color: 'var(--primary-shadow)', borderColor: '#FED7AA' }}
-                    >
-                      🏁
-                    </span>
+                    <div className="stage-pill stage-applied">
+                      <span className="sub">APPLIED</span>
+                      <span className="lbl">応用</span>
+                      <span className="rng">Day 11 〜 20</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -672,10 +826,6 @@ function FeatureA() {
               <li>
                 <span className="check orange">✓</span>
                 <span>1日のレッスンは必ず<strong>10分前後</strong>に収まる粒度</span>
-              </li>
-              <li>
-                <span className="check orange">✓</span>
-                <span>進捗に合わせて<strong>後半の難易度を自動調整</strong></span>
               </li>
             </ul>
           </div>
@@ -704,61 +854,49 @@ function FeatureB() {
             <div className="phone phone-tilt">
               <div className="phone-screen">
                 <PhoneStatus minimal />
-                <div className="full-article">
-                  <div className="meta">
-                    <span
-                      style={{
-                        background: 'var(--primary)',
-                        color: '#fff',
-                        padding: '4px 9px',
-                        borderRadius: 999,
-                        fontFamily: 'var(--font-en)',
-                        fontWeight: 900,
-                        fontSize: 10,
-                        letterSpacing: '0.3px',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      DAY 7
-                    </span>
-                    <span
-                      style={{
-                        fontSize: 10,
-                        color: 'var(--slate)',
-                        fontWeight: 800,
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 3,
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      ⏱ 約10分
-                    </span>
+                <div className="full-article-app">
+                  <div className="article-progress">
+                    <div className="fill" style={{ width: '23%' }} />
                   </div>
-                  <h5>
-                    価格はコストではなく、
-                    <br />
-                    価値で決める。
-                  </h5>
-                  <p className="body">
-                    商品の値段は、<em>かかった原価</em>で決めるものではありません。
-                    <br />
-                    本当に大切なのは、お客さんが受け取る<em>価値</em>から逆算すること。
-                  </p>
-                  <p className="body">
-                    同じ商品でも、誰がどんな場面で買うかで「払ってもいい金額」は大きく変わります。
-                  </p>
-                  <div className="tip-box">
-                    <span className="ico">💡</span>
-                    <span>
-                      <strong>Tip:</strong> 「いくらかかったか」ではなく「相手にどんな良いことが起きるか」で値段を考えよう。
-                    </span>
+                  <div className="article-head">
+                    <div className="back-btn" aria-hidden="true">
+                      <svg width="12" height="12" viewBox="0 0 16 16">
+                        <path d="M10 3 L4 8 L10 13" stroke="#0F172A" strokeWidth="2.4" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </div>
+                    <div className="head-meta">
+                      <div className="kicker">DAY 7</div>
+                      <div className="head-title">価値で決める価格</div>
+                    </div>
                   </div>
-                  <div className="tip-box action">
-                    <span className="ico">✅</span>
-                    <span>
-                      <strong>Action:</strong> 自分のサービスを「価値」の言葉で1行書いてみる。
-                    </span>
+                  <div className="article-body">
+                    <h1 className="art-h1">
+                      価格はコストではなく、
+                      <br />
+                      価値で決める。
+                    </h1>
+                    <div className="art-meta">DAY 7 / 30 · 約10分</div>
+                    <h2 className="art-h2">価値ベースの考え方</h2>
+                    <p className="art-p">
+                      商品の値段は、<em>かかった原価</em>で決めるものではありません。本当に大切なのは、お客さんが受け取る<em>価値</em>から逆算することです。
+                    </p>
+                    <p className="art-p">
+                      同じ商品でも、誰がどんな場面で買うかで「払ってもいい金額」は変わります。
+                    </p>
+                    <div className="tip-box">
+                      <span className="ico">💡</span>
+                      <span>
+                        <strong>Tip:</strong> 「いくらかかったか」ではなく「相手にどんな良いことが起きるか」で値段を考えよう。
+                      </span>
+                    </div>
+                    <div className="art-done-btn">
+                      ✓ 読み終わった!
+                    </div>
+                  </div>
+                  <div className="chat-fab" aria-hidden="true">
+                    <svg width="20" height="20" viewBox="0 0 22 22" fill="none">
+                      <path d="M3 5 Q3 3 5 3 H17 Q19 3 19 5 V13 Q19 15 17 15 H10 L6 19 V15 H5 Q3 15 3 13 Z" fill="#fff" />
+                    </svg>
                   </div>
                 </div>
               </div>
@@ -824,22 +962,52 @@ function FeatureC() {
             <div className="phone phone-tilt-l">
               <div className="phone-screen">
                 <PhoneStatus minimal />
-                <div className="full-chat">
-                  <div className="lesson-head">
-                    <strong>DAY 7・価値で決める価格</strong>
-                    AIアシスタントに質問
-                  </div>
-                  <div className="bubbles">
-                    <div className="bubble ai">こんにちは!今日のレッスンで気になったところはありますか?😊</div>
-                    <div className="bubble user">「価値から逆算」がよく分からなくて...具体例を教えて</div>
-                    <div className="bubble ai">
-                      いいですね!たとえば同じコーヒー1杯でも、自販機なら150円、カフェだと500円。同じ豆でも<strong>提供する体験</strong>が違うので、お客さんが感じる価値が変わるんです。
+                <div className="full-chat full-chat-app">
+                  <div className="chat-topbar">
+                    <div className="back-btn" aria-hidden="true">
+                      <svg width="12" height="12" viewBox="0 0 16 16">
+                        <path d="M10 3 L4 8 L10 13" stroke="#0F172A" strokeWidth="2.4" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
                     </div>
-                    <div className="bubble user">なるほど。自分のサービスでも考えてみる!</div>
+                    <img className="chat-avatar" src="/icon-192.png" alt="" />
+                    <div className="chat-titles">
+                      <div className="name">AIアシスタント</div>
+                      <div className="status">
+                        <span className="dot" />
+                        オンライン
+                      </div>
+                    </div>
                   </div>
-                  <div className="chat-input">
-                    メッセージを入力…
-                    <span className="send" aria-hidden="true">↑</span>
+                  <div className="chat-stream">
+                    <div className="session-sep">─── 今日のセッション ───</div>
+                    <div className="bubbles">
+                      <div className="msg msg-ai">
+                        <img className="msg-avatar" src="/icon-192.png" alt="" />
+                        <div className="bubble ai">こんにちは!今日のレッスンで気になったところはありますか?😊</div>
+                      </div>
+                      <div className="msg msg-user">
+                        <div className="bubble user">「価値から逆算」がよく分からなくて...具体例を教えて</div>
+                      </div>
+                      <div className="msg msg-ai">
+                        <img className="msg-avatar" src="/icon-192.png" alt="" />
+                        <div className="bubble ai">
+                          いいですね!たとえば同じコーヒー1杯でも、自販機なら150円、カフェだと500円。同じ豆でも<strong>提供する体験</strong>が違うので、お客さんが感じる価値が変わるんです。
+                        </div>
+                      </div>
+                      <div className="msg msg-user">
+                        <div className="bubble user">なるほど。自分のサービスでも考えてみる!</div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="chat-input-row">
+                    <div className="chat-input-pill">
+                      <span className="ph">メッセージを入力...</span>
+                      <span className="send" aria-hidden="true">
+                        <svg width="14" height="14" viewBox="0 0 16 16">
+                          <path d="M2 8 L14 2 L10 14 L8 9 Z" fill="#fff" />
+                        </svg>
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -916,44 +1084,55 @@ function FeatureD({
             <div className="phone phone-tilt">
               <div className="phone-screen">
                 <PhoneStatus minimal />
-                <div className="full-streak">
-                  <img className="flame-big-icon" src={FLAME_SRC} alt="" />
-                  <div ref={streakRef}>
-                    <div className="streak-num">
-                      {streakValue}
-                      <span className="unit">日</span>
-                    </div>
-                    <div className="streak-label">
-                      連続でレッスン完了中
-                      <br />
-                      <strong>あと18日でゴール!</strong>
+                <div className="full-streak full-streak-app">
+                  <div className="profile-name">Akiさん</div>
+                  <div className="streak-card-app" ref={streakRef}>
+                    <img className="streak-flame-app" src="/icon-192.png" alt="" />
+                    <div className="streak-info">
+                      <div className="streak-label-up">連続記録</div>
+                      <div className="streak-num-row">
+                        <span className="streak-num-big">{streakValue}</span>
+                        <span className="streak-unit-jp">日連続</span>
+                      </div>
+                      <div className="streak-best">
+                        最長記録 <strong>18日</strong>
+                      </div>
                     </div>
                   </div>
-                  <div className="weekly-big">
-                    <div
-                      className="label"
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        fontSize: 10,
-                        color: 'var(--slate)',
-                        fontWeight: 800,
-                        letterSpacing: '0.5px',
-                        textTransform: 'uppercase',
-                      }}
-                    >
-                      <span>今週</span>
-                      <span>5 / 7 完了</span>
+                  <div className="stats-grid">
+                    <div className="stat-card stat-orange">
+                      <div className="stat-label">最長連続</div>
+                      <div className="stat-value-row">
+                        <span className="stat-num">18</span>
+                        <span className="stat-unit">日</span>
+                      </div>
                     </div>
-                    <div className="row">
-                      <span className="day-circle done">月</span>
-                      <span className="day-circle done">火</span>
-                      <span className="day-circle done">水</span>
-                      <span className="day-circle done">木</span>
-                      <span className="day-circle today">金</span>
-                      <span className="day-circle">土</span>
-                      <span className="day-circle">日</span>
+                    <div className="stat-card stat-mint">
+                      <div className="stat-label">完了レッスン</div>
+                      <div className="stat-value-row">
+                        <span className="stat-num">47</span>
+                        <span className="stat-unit">本</span>
+                      </div>
                     </div>
+                  </div>
+                  <div className="badges-row">
+                    <div className="badge-cell-section">バッジ</div>
+                  </div>
+                  <div className="badges-grid">
+                    {[
+                      { ico: '📚', label: '初学習', unlocked: true },
+                      { ico: '🔥', label: '7日連続', unlocked: true },
+                      { ico: '💎', label: '30日連続', unlocked: false },
+                      { ico: '🌟', label: '50日連続', unlocked: false },
+                      { ico: '🏆', label: '100日連続', unlocked: false },
+                    ].map((b, i) => (
+                      <div key={i} className="badge-cell">
+                        <div className={`badge-icon ${b.unlocked ? 'on' : 'off'}`}>
+                          {b.unlocked ? b.ico : '🔒'}
+                        </div>
+                        <div className={`badge-name ${b.unlocked ? 'on' : ''}`}>{b.label}</div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>
@@ -963,27 +1142,27 @@ function FeatureD({
           <div className="copy">
             <span className="eyebrow">Feature 04</span>
             <h2>
-              ストリークで、
+              ストリークとバッジで、
               <br />
               「やめない」を仕掛ける。
             </h2>
             <p>
-              連続日数とウィークリーチェックで、続けることそのものをご褒美に。
+              連続日数・最長記録・完了レッスン本数を見える化。
               <br />
-              忙しい日のための「マイルストン保護」もあるので、1日休んでも炎は消えません。
+              節目ごとに獲得できるバッジが、続けることそのものをご褒美に変えます。
             </p>
             <ul>
               <li>
                 <span className="check orange">✓</span>
-                <span><strong>連続日数</strong>と<strong>週次トラッカー</strong>で進捗が見える</span>
+                <span><strong>連続日数</strong>が今日のひと押しになる</span>
               </li>
               <li>
                 <span className="check orange">✓</span>
-                <span>夜のリマインドはあなたの<strong>習慣時間</strong>に合わせて自動調整</span>
+                <span><strong>最長記録</strong>と<strong>完了レッスン本数</strong>で積み上げが分かる</span>
               </li>
               <li>
                 <span className="check orange">✓</span>
-                <span>1日休んでも<strong>炎が消えない</strong>セーフティ</span>
+                <span><strong>7日 / 30日 / 50日 / 100日連続</strong>のバッジで節目を実感</span>
               </li>
             </ul>
           </div>
@@ -1031,7 +1210,17 @@ function Tags() {
 // ----------------------------------------------------------------
 // Pricing
 // ----------------------------------------------------------------
-function Pricing({ startHref }: { startHref: string }) {
+function Pricing({
+  startHref,
+  onFadeNavigate,
+}: {
+  startHref: string;
+  onFadeNavigate: (to: string) => void;
+}) {
+  const onCta = (e: React.MouseEvent<HTMLAnchorElement>, to: string) => {
+    e.preventDefault();
+    onFadeNavigate(to);
+  };
   return (
     <section className="pricing" id="pricing">
       <div className="container">
@@ -1040,45 +1229,120 @@ function Pricing({ startHref }: { startHref: string }) {
           <h2>
             まずは無料で、
             <br />
-            30日まるごと試せます。
+            <span className="marker-y">10レッスン</span>まるごと試せます。
           </h2>
+          <p className="lede">
+            続けられそうなら、コースもAIアシスタントも無制限の
+            <br />
+            プレミアムプランへ。
+          </p>
         </div>
 
-        <div className="pricing-grid stagger" data-reveal>
-          <div className="price-card featured">
-            <div className="plan">Free Plan</div>
-            <h3>無料プラン</h3>
-            <div className="amount">
-              <span className="yen">¥</span>0<span className="per"> / ずっと</span>
+        <div className="pricing-grid-app stagger" data-reveal>
+          <div className="price-free-card">
+            <div className="free-eyebrow">
+              <span className="free-bar" />
+              FREE
             </div>
-            <hr />
-            <ul>
-              <li><span className="ck">✓</span>コースは<strong>1つ</strong>まで</li>
-              <li><span className="ck">✓</span>30日分の<strong>全レッスン</strong></li>
-              <li><span className="ck">✓</span>AIアシスタントとのチャット</li>
-              <li><span className="ck">✓</span>ストリーク・週次トラッカー</li>
+            <div className="free-name">無料プラン</div>
+
+            <div className="free-price-row">
+              <span className="yen">¥</span>
+              <span className="num">0</span>
+              <span className="per">/ ずっと</span>
+            </div>
+
+            <ul className="free-features">
+              <li>
+                <span className="ck on">
+                  <svg width="12" height="12" viewBox="0 0 12 12">
+                    <path d="M2 6 L5 9 L10 3" stroke="#16A34A" strokeWidth="2.2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </span>
+                <span>1コースまで作成可能</span>
+              </li>
+              <li>
+                <span className="ck on">
+                  <svg width="12" height="12" viewBox="0 0 12 12">
+                    <path d="M2 6 L5 9 L10 3" stroke="#16A34A" strokeWidth="2.2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </span>
+                <span>10レッスンまで受講可能</span>
+              </li>
+              <li>
+                <span className="ck off">
+                  <svg width="9" height="9" viewBox="0 0 9 9">
+                    <path d="M2 2 L7 7 M7 2 L2 7" stroke="#DC2626" strokeWidth="1.8" strokeLinecap="round" />
+                  </svg>
+                </span>
+                <span className="muted">AIアシスタント機能は利用不可</span>
+              </li>
             </ul>
-            <Link className="btn btn-outline-orange btn-lg" to={startHref}>
-              <span className="jp">無料で始める</span>
-              <span aria-hidden="true">→</span>
-            </Link>
+
+            <div className="card-cta-wrap">
+              <Link
+                className="btn-free-cta"
+                to={startHref}
+                onClick={(e) => onCta(e, startHref)}
+              >
+                <span className="jp">まずは無料で始める</span>
+                <span aria-hidden="true">→</span>
+              </Link>
+              <div className="free-fine">いつでもプレミアムにアップグレード可能</div>
+            </div>
           </div>
 
-          <div className="price-card coming">
-            <span className="coming-badge">COMING SOON</span>
-            <div className="plan">Pro Plan</div>
-            <h3>有料プラン</h3>
-            <div className="amount">準備中</div>
-            <hr />
-            <ul>
-              <li><span className="ck">✓</span>コース<strong>無制限</strong></li>
-              <li><span className="ck">✓</span>並行で<strong>複数テーマ</strong>を学習</li>
-              <li><span className="ck">✓</span>新機能の<strong>早期アクセス</strong></li>
-              <li><span className="ck">✓</span>無料プランの全機能</li>
+          <div className="price-premium-card">
+            <span className="prem-blob" aria-hidden="true" />
+            <div className="prem-eyebrow">
+              <span className="prem-bar" />
+              PREMIUM
+            </div>
+            <div className="prem-name">DailyLearn プレミアム</div>
+
+            <div className="prem-price-row">
+              <span className="yen">¥</span>
+              <span className="num">980</span>
+              <span className="per">/ 月</span>
+            </div>
+            <div className="prem-yearly-note">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <path d="M3 7 L6 10 L11 4" stroke="#86EFAC" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              <span>
+                年額 <strong>¥9,800</strong>(<strong>2ヶ月分無料</strong>)も選べます
+              </span>
+            </div>
+
+            <ul className="prem-features">
+              {[
+                { text: 'コース', value: '無制限' },
+                { text: 'レッスン', value: '無制限' },
+                { text: 'AIアシスタント', value: '無制限' },
+              ].map((f) => (
+                <li key={f.text} className="prem-feature-row">
+                  <span className="check-box">
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                      <path d="M3 7 L6 10 L11 4" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </span>
+                  <span className="ftxt">{f.text}</span>
+                  <span className="vchip">{f.value}</span>
+                </li>
+              ))}
             </ul>
-            <button className="btn btn-disabled btn-lg" disabled>
-              <span className="jp">順次公開</span>
-            </button>
+
+            <div className="card-cta-wrap">
+              <Link
+                className="btn-prem-cta"
+                to={startHref}
+                onClick={(e) => onCta(e, startHref)}
+              >
+                <span className="jp">プレミアムを始める</span>
+                <span aria-hidden="true">→</span>
+              </Link>
+              <div className="prem-fine">いつでもキャンセル可能 · 自動更新</div>
+            </div>
           </div>
         </div>
       </div>
@@ -1164,7 +1428,13 @@ function FaqItem({
 // ----------------------------------------------------------------
 // Final CTA
 // ----------------------------------------------------------------
-function FinalCta({ startHref }: { startHref: string }) {
+function FinalCta({
+  startHref,
+  onFadeNavigate,
+}: {
+  startHref: string;
+  onFadeNavigate: (to: string) => void;
+}) {
   return (
     <section className="final-cta" id="cta">
       <div className="container">
@@ -1226,14 +1496,21 @@ function FinalCta({ startHref }: { startHref: string }) {
               <path d="M4 12 Q12 2 22 12 T42 12 T58 12" />
             </svg>
 
-            <Link className="btn btn-primary btn-xl" to={startHref}>
-              <span className="jp">学習を始める</span>
+            <Link
+              className="btn btn-primary btn-xl"
+              to={startHref}
+              onClick={(e) => {
+                e.preventDefault();
+                onFadeNavigate(startHref);
+              }}
+            >
+              <span className="jp">アプリを開く</span>
               <span aria-hidden="true">→</span>
             </Link>
           </div>
 
           <div style={{ marginTop: 24, fontSize: 13, color: 'var(--slate-2)', fontWeight: 700 }}>
-            クレジットカード不要 ・ 30秒で開始 ・ いつでもやめられます
+            30秒で開始 ・ いつでもやめられます
           </div>
         </div>
       </div>
@@ -1257,12 +1534,10 @@ function Footer() {
               Daily<span className="dot">Learn</span>
             </span>
           </div>
-          <span className="copy">© 2026 DailyLearn Inc.</span>
         </div>
         <nav className="footer-links">
           <a href="#">プライバシー</a>
           <a href="#">利用規約</a>
-          <a href="#">特定商取引法</a>
           <a href="#">お問い合わせ</a>
         </nav>
       </div>
@@ -1314,12 +1589,12 @@ function Doodle({
 }) {
   const props = strokeStyle
     ? {
-        fill: 'none',
-        stroke: 'currentColor',
-        strokeWidth: 3,
-        strokeLinecap: 'round' as const,
-        strokeLinejoin: 'round' as const,
-      }
+      fill: 'none',
+      stroke: 'currentColor',
+      strokeWidth: 3,
+      strokeLinecap: 'round' as const,
+      strokeLinejoin: 'round' as const,
+    }
     : { fill };
   return (
     <svg

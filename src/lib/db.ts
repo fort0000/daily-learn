@@ -234,17 +234,35 @@ async function throwIfPlanLimit(err: unknown): Promise<void> {
 
 // On-demand lesson body generation. Idempotent: if body is already non-null,
 // the Edge Function returns it without calling Anthropic.
-export async function requestLessonGeneration(lessonId: string): Promise<unknown> {
-  const { data, error } = await supabase.functions.invoke<{ body: unknown }>(
-    'lessons-generate',
-    { body: { lesson_id: lessonId } },
-  );
-  if (error) {
-    await throwIfPlanLimit(error);
-    throw error;
-  }
-  if (!data?.body) throw new Error('lessons-generate returned no body');
-  return data.body;
+//
+// Same-tab dedup: if a generation for this lesson is already in flight, return
+// the existing Promise instead of firing a second Edge Function call. Without
+// this, navigating away mid-generation and back would trigger another Anthropic
+// call (the DB-level WHERE body IS NULL guard prevents double writes, but only
+// after both API calls have already run).
+const inflightGenerations = new Map<string, Promise<unknown>>();
+
+export function requestLessonGeneration(lessonId: string): Promise<unknown> {
+  const existing = inflightGenerations.get(lessonId);
+  if (existing) return existing;
+
+  const promise = (async () => {
+    const { data, error } = await supabase.functions.invoke<{ body: unknown }>(
+      'lessons-generate',
+      { body: { lesson_id: lessonId } },
+    );
+    if (error) {
+      await throwIfPlanLimit(error);
+      throw error;
+    }
+    if (!data?.body) throw new Error('lessons-generate returned no body');
+    return data.body;
+  })().finally(() => {
+    inflightGenerations.delete(lessonId);
+  });
+
+  inflightGenerations.set(lessonId, promise);
+  return promise;
 }
 
 // Read-only body fetch. Used by the Article screen on every open since the

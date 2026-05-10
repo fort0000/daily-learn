@@ -13,10 +13,19 @@ import {
 } from '../lib/db';
 import { useProfile, useSession } from '../lib/auth';
 
-export function ChatScreen() {
+type Props = {
+  // When provided, the screen runs in "embedded" mode: it uses the given
+  // lesson id directly, the back button calls onClose instead of routing,
+  // and the TabBar is hidden (the host page provides chrome).
+  embeddedLessonId?: string;
+  onClose?: () => void;
+};
+
+export function ChatScreen({ embeddedLessonId, onClose }: Props = {}) {
   const navigate = useNavigate();
   const params = useParams();
-  const lessonId = params.lessonId ?? null;
+  const embedded = embeddedLessonId !== undefined;
+  const lessonId = embedded ? embeddedLessonId ?? null : params.lessonId ?? null;
   const session = useSession();
   const userId = session.session?.user.id ?? null;
   const { profile } = useProfile(userId);
@@ -105,9 +114,16 @@ export function ChatScreen() {
   return (
     <Phone bg="#FFFBF5">
       <StatusBar />
-      <div className="pt-1 px-4 pb-3 pr-[76px] flex items-center gap-3 border-b border-dl-border">
+      <div className={`pt-1 px-4 pb-3 ${embedded ? '' : 'pr-[76px]'} flex items-center gap-3 border-b border-dl-border`}>
         <div
-          onClick={() => (lessonId ? navigate(`/lessons/${lessonId}`, { replace: true }) : navigate(-1))}
+          onClick={() => {
+            if (embedded) {
+              onClose?.();
+              return;
+            }
+            if (lessonId) navigate(`/lessons/${lessonId}`, { replace: true });
+            else navigate(-1);
+          }}
           className="w-[38px] h-[38px] rounded-xl bg-white border-[1.5px] border-dl-border flex items-center justify-center cursor-pointer shrink-0"
         >
           <svg width="16" height="16" viewBox="0 0 16 16">
@@ -196,7 +212,7 @@ export function ChatScreen() {
         </div>
       </div>
 
-      <TabBar active="home" />
+      {!embedded && <TabBar active="home" />}
     </Phone>
   );
 }

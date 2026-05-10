@@ -6,6 +6,7 @@ import { StatusBar } from '../components/StatusBar';
 import { TabBar } from '../components/TabBar';
 import { PushButton } from '../components/PushButton';
 import { LessonRenderer } from '../components/LessonRenderer';
+import { ChatScreen } from './Chat';
 import {
   PlanLimitError,
   fetchLesson,
@@ -30,6 +31,20 @@ export function ArticleScreen() {
   const [lesson, setLesson] = useState<Lesson | null>(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+  // Chat overlay: `mounted` keeps the panel in the tree so the close
+  // animation can run; `visible` drives the clip-path reveal.
+  const [chatMounted, setChatMounted] = useState(false);
+  const [chatVisible, setChatVisible] = useState(false);
+
+  const openChat = () => {
+    if (!lesson) return;
+    setChatMounted(true);
+    requestAnimationFrame(() => requestAnimationFrame(() => setChatVisible(true)));
+  };
+  const closeChat = () => {
+    setChatVisible(false);
+    setTimeout(() => setChatMounted(false), 460);
+  };
   // True only while requestLessonGeneration is running (body was actually
   // missing). During requestLessonRead we still show a placeholder, but the
   // copy is "loading" rather than "generating".
@@ -227,17 +242,105 @@ export function ArticleScreen() {
         )}
       </div>
 
+      {/* Floating chat FAB. Morphs between bubble (closed) and book / back-to-lesson
+          (open). When closed, idle-bobs and shows a pulsing ring to draw attention.
+          The chat overlay reveals from the FAB position via a circular clip-path. */}
       <div
-        onClick={() => lesson && navigate(`/lessons/${lesson.id}/chat`, { replace: true })}
-        title="AIアシスタントに質問"
-        className={`absolute bottom-6 right-[18px] z-25 w-[58px] h-[58px] rounded-full bg-dl-mint flex items-center justify-center shadow-[0_5px_0_#0F7A38,0_10px_24px_rgba(15,23,42,0.18)] ${
+        onClick={() => {
+          if (!lesson) return;
+          if (chatVisible) closeChat();
+          else openChat();
+        }}
+        title={chatVisible ? 'レッスンに戻る' : 'AIアシスタントに質問'}
+        className={`absolute bottom-6 right-[18px] z-[60] w-[58px] h-[58px] rounded-full flex items-center justify-center ${
           lesson ? 'cursor-pointer' : 'opacity-50 cursor-not-allowed pointer-events-none'
         }`}
+        style={{
+          background: chatVisible ? DL.navy : DL.mint,
+          boxShadow: chatVisible
+            ? '0 4px 0 #1E293B, 0 8px 20px rgba(15,23,42,0.35)'
+            : '0 5px 0 #0F7A38, 0 10px 24px rgba(15,23,42,0.18)',
+          transition:
+            'background 320ms ease, box-shadow 320ms ease, transform 220ms cubic-bezier(.34,1.56,.64,1)',
+          animation: !chatMounted && lesson ? 'dlFabBob 2.4s ease-in-out infinite' : 'none',
+        }}
       >
-        <svg width="28" height="28" viewBox="0 0 22 22" fill="none">
-          <path d="M3 5 Q3 3 5 3 H17 Q19 3 19 5 V13 Q19 15 17 15 H10 L6 19 V15 H5 Q3 15 3 13 Z" fill="#fff" />
-        </svg>
+        {/* Chat-bubble icon — visible when closed */}
+        <div
+          className="absolute inset-0 flex items-center justify-center"
+          style={{
+            transition: 'opacity 220ms ease, transform 320ms cubic-bezier(.34,1.56,.64,1)',
+            opacity: chatVisible ? 0 : 1,
+            transform: chatVisible ? 'rotate(-90deg) scale(0.6)' : 'rotate(0) scale(1)',
+          }}
+        >
+          <svg width="26" height="26" viewBox="0 0 22 22" fill="none">
+            <path d="M3 5 Q3 3 5 3 H17 Q19 3 19 5 V13 Q19 15 17 15 H10 L6 19 V15 H5 Q3 15 3 13 Z" fill="#fff" />
+          </svg>
+        </div>
+        {/* Book / back-to-lesson icon — visible when chat is open */}
+        <div
+          className="absolute inset-0 flex items-center justify-center"
+          style={{
+            transition: 'opacity 220ms ease, transform 320ms cubic-bezier(.34,1.56,.64,1)',
+            opacity: chatVisible ? 1 : 0,
+            transform: chatVisible ? 'rotate(0) scale(1)' : 'rotate(90deg) scale(0.6)',
+          }}
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+            <path
+              d="M5 4 H17 Q19 4 19 6 V20 L12 17 L5 20 Z"
+              stroke="#fff"
+              strokeWidth="2.4"
+              strokeLinejoin="round"
+              fill="none"
+            />
+          </svg>
+        </div>
+        {/* Pulsing ring when closed */}
+        {!chatVisible && lesson && (
+          <div
+            className="absolute -inset-1 rounded-full pointer-events-none"
+            style={{
+              border: `2px solid ${DL.mint}`,
+              opacity: 0.6,
+              animation: 'dlFabPulse 1.8s ease-out infinite',
+            }}
+          />
+        )}
       </div>
+
+      {/* Chat overlay — circle clip-path reveal from the FAB position.
+          Origin matches the FAB center: ~47px from right, ~53px from bottom. */}
+      {chatMounted && lesson && (
+        <div
+          className="absolute inset-0 z-[55]"
+          style={{
+            clipPath: chatVisible
+              ? 'circle(140% at calc(100% - 47px) calc(100% - 53px))'
+              : 'circle(0px at calc(100% - 47px) calc(100% - 53px))',
+            WebkitClipPath: chatVisible
+              ? 'circle(140% at calc(100% - 47px) calc(100% - 53px))'
+              : 'circle(0px at calc(100% - 47px) calc(100% - 53px))',
+            transition:
+              'clip-path 460ms cubic-bezier(.4,0,.2,1), -webkit-clip-path 460ms cubic-bezier(.4,0,.2,1)',
+            pointerEvents: chatVisible ? 'auto' : 'none',
+          }}
+        >
+          <ChatScreen embeddedLessonId={lesson.id} onClose={closeChat} />
+        </div>
+      )}
+
+      <style>{`
+        @keyframes dlFabBob {
+          0%, 100% { transform: translateY(0); }
+          50%      { transform: translateY(-3px); }
+        }
+        @keyframes dlFabPulse {
+          0%   { transform: scale(1); opacity: 0.6; }
+          100% { transform: scale(1.5); opacity: 0; }
+        }
+      `}</style>
 
       <TabBar active="home" />
     </Phone>

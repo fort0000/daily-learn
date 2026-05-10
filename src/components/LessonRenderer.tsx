@@ -1,70 +1,55 @@
 import { Fragment, type ReactNode } from 'react';
-import type { LessonBody, LessonBlock, LessonHero } from '../lib/lessonBody';
+import type { LessonBody, LessonBlock, LessonReference } from '../lib/lessonBody';
 
 // Renders a structured LessonBody. Block order is preserved as-is — no
 // reordering. Inline ==highlight== and **bold** are the only supported
 // inline marks (anything else is rendered as plain text).
 
 export function LessonRenderer({ body }: { body: LessonBody }) {
+  // Auto-number headings: the model writes the title only ("複利は…の仕組み"),
+  // and we prepend "1.", "2.", … based on heading position. This keeps the
+  // body data clean and makes inserting/removing sections re-flow cleanly.
+  const headingNumbers = computeHeadingNumbers(body.blocks);
   return (
     <>
-      <Hero hero={body.hero} />
       <Points points={body.points} />
       <div className="space-y-3.5">
-        {body.blocks.map((b, i) => (
-          <Block key={i} block={b} />
-        ))}
+        {body.blocks.map((b, i) =>
+          b.type === 'heading' ? (
+            <Heading key={i} index={headingNumbers[i]} text={b.text} />
+          ) : (
+            <Block key={i} block={b} />
+          ),
+        )}
       </div>
+      {body.references && body.references.length > 0 && (
+        <References references={body.references} />
+      )}
     </>
   );
 }
 
-function Hero({ hero }: { hero: LessonHero }) {
-  return (
-    <div className="bg-white rounded-[20px] px-4 py-4 border-[1.5px] border-dl-border mb-3.5 relative overflow-hidden">
-      <div className="text-[10px] font-extrabold tracking-[0.18em] text-dl-primary font-jp">
-        {hero.theme}
-      </div>
-      <div className="mt-2 h-[68px] flex items-center justify-center">
-        <HeroVisual visual={hero.visual} />
-      </div>
-    </div>
-  );
+function computeHeadingNumbers(blocks: LessonBlock[]): number[] {
+  const out: number[] = [];
+  let n = 0;
+  for (const b of blocks) {
+    if (b.type === 'heading') {
+      n += 1;
+      out.push(n);
+    } else {
+      out.push(0);
+    }
+  }
+  return out;
 }
 
-function HeroVisual({ visual }: { visual: LessonHero['visual'] }) {
-  if (visual === 'bubbles') {
-    return (
-      <svg width="160" height="60" viewBox="0 0 160 60" aria-hidden>
-        <circle cx="30" cy="30" r="22" fill="#FFE4D5" />
-        <circle cx="80" cy="30" r="22" fill="#FFD0B8" />
-        <circle cx="130" cy="30" r="22" fill="#FFBA9A" />
-      </svg>
-    );
-  }
-  if (visual === 'chart') {
-    return (
-      <svg width="160" height="60" viewBox="0 0 160 60" aria-hidden>
-        <polyline
-          points="8,52 40,40 72,28 104,18 136,8 152,4"
-          fill="none"
-          stroke="#FF7A45"
-          strokeWidth="3"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        <line x1="8" y1="52" x2="152" y2="52" stroke="#F1E8DC" strokeWidth="2" />
-      </svg>
-    );
-  }
-  if (visual === 'icon') {
-    return (
-      <div className="w-[56px] h-[56px] rounded-2xl bg-dl-cream flex items-center justify-center text-3xl">
-        💡
-      </div>
-    );
-  }
-  return null;
+function Heading({ index, text }: { index: number; text: string }) {
+  return (
+    <h2 className="text-[17px] font-black text-dl-navy font-jp leading-[1.45] mt-5 mb-1 tracking-[-0.2px]">
+      <span className="text-dl-primary mr-1.5 tabular-nums">{index}.</span>
+      {renderInline(text)}
+    </h2>
+  );
 }
 
 function Points({ points }: { points: [string, string, string] }) {
@@ -89,7 +74,7 @@ function Points({ points }: { points: [string, string, string] }) {
   );
 }
 
-function Block({ block }: { block: LessonBlock }) {
+function Block({ block }: { block: Exclude<LessonBlock, { type: 'heading' }> }) {
   if (block.type === 'paragraph') {
     return (
       <p className="text-[14px] leading-[1.85] text-dl-navy font-jp font-semibold m-0">
@@ -121,52 +106,108 @@ function Block({ block }: { block: LessonBlock }) {
   );
 }
 
+function References({ references }: { references: LessonReference[] }) {
+  return (
+    <div className="mt-5 bg-white rounded-[18px] px-4 py-3.5 border-[1.5px] border-dl-border">
+      <div className="text-[13px] font-black text-dl-navy font-jp mb-2.5">
+        📎 参考文献
+      </div>
+      <ol className="space-y-2 list-none pl-0">
+        {references.map((r, i) => (
+          <li key={i} className="flex items-start gap-2">
+            <span className="shrink-0 text-[11px] font-extrabold text-dl-slate font-jp mt-[3px] tabular-nums">
+              [{i + 1}]
+            </span>
+            <a
+              href={r.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[13px] leading-[1.6] text-dl-primary font-jp font-semibold underline decoration-dotted underline-offset-2 break-all hover:opacity-80"
+            >
+              {r.title}
+            </a>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
 // Mini Markdown: ==highlight== → <mark>, **bold** → <strong>. Anything else
 // is rendered verbatim. We intentionally don't run a real MD parser so the
 // LessonBody contract stays narrow (no headings, no lists inside paragraphs).
-function renderInline(text: string): ReactNode {
-  // Tokenize into segments. We do two passes: first split on ==…==, then
-  // each non-highlight segment is split on **…**.
-  const out: ReactNode[] = [];
-  const HIGHLIGHT = /==([^=]+)==/g;
-  let lastIdx = 0;
-  let match: RegExpExecArray | null;
-  let key = 0;
-  while ((match = HIGHLIGHT.exec(text)) !== null) {
-    if (match.index > lastIdx) {
-      out.push(<Fragment key={key++}>{renderBold(text.slice(lastIdx, match.index), key)}</Fragment>);
-    }
-    out.push(
-      <mark
-        key={key++}
-        className="bg-[#FFE6A8] text-dl-navy rounded px-1 py-px not-italic"
-      >
-        {renderBold(match[1], key)}
-      </mark>,
-    );
-    lastIdx = match.index + match[0].length;
-  }
-  if (lastIdx < text.length) {
-    out.push(<Fragment key={key++}>{renderBold(text.slice(lastIdx), key)}</Fragment>);
-  }
-  return out;
+//
+// Both marks are matched in a SINGLE regex alternation, then we recurse into
+// the captured inner text so nesting works (e.g. **==X==** or ==**X**==).
+// The previous two-pass approach split highlights first and orphaned the **
+// markers when bold wrapped a highlight, producing literal `**` in output.
+function renderInline(rawText: string): ReactNode {
+  // Strip any <cite …>/</cite> wrapper tags that the Anthropic web_search
+  // path occasionally bleeds into paragraph text. Server also strips, but we
+  // keep this guard so legacy rows already in the DB render cleanly.
+  const text = rawText.replace(/<\/?cite\b[^>]*>/gi, '');
+  return tokenizeMarks(text, { v: 0 });
 }
 
-function renderBold(text: string, baseKey: number): ReactNode {
+// Shared key counter passed by reference so recursive calls don't collide.
+type KeyCounter = { v: number };
+
+function tokenizeMarks(text: string, key: KeyCounter): ReactNode[] {
   const out: ReactNode[] = [];
-  const BOLD = /\*\*([^*]+)\*\*/g;
-  let lastIdx = 0;
-  let match: RegExpExecArray | null;
-  let key = baseKey * 1000;
-  while ((match = BOLD.exec(text)) !== null) {
-    if (match.index > lastIdx) {
-      out.push(<Fragment key={key++}>{text.slice(lastIdx, match.index)}</Fragment>);
+  // Group 1 = bold inner, Group 2 = highlight inner, Group 3 = bare URL.
+  // URLs stop at whitespace, common Japanese brackets, or punctuation that's
+  // almost always the *outer* sentence's terminator (。、, .) — not the
+  // URL's content. We also exclude `()` to avoid swallowing the closing
+  // paren of a wrapping `（…）`. Non-greedy on bold/highlight so the
+  // shortest valid pair wins when multiple are on the same line.
+  const RE =
+    /\*\*([^*]+?)\*\*|==([^=]+?)==|(https?:\/\/[^\s<>「」『』()（）、。,]+)/g;
+  let last = 0;
+  let m: RegExpExecArray | null;
+  while ((m = RE.exec(text)) !== null) {
+    if (m.index > last) {
+      out.push(<Fragment key={key.v++}>{text.slice(last, m.index)}</Fragment>);
     }
-    out.push(<strong key={key++} className="font-black text-dl-navy">{match[1]}</strong>);
-    lastIdx = match.index + match[0].length;
+    if (m[1] !== undefined) {
+      out.push(
+        <strong key={key.v++} className="font-black text-dl-navy">
+          {tokenizeMarks(m[1], key)}
+        </strong>,
+      );
+    } else if (m[2] !== undefined) {
+      out.push(
+        <mark
+          key={key.v++}
+          className="bg-[#FFE6A8] text-dl-navy rounded px-1 py-px not-italic"
+        >
+          {tokenizeMarks(m[2], key)}
+        </mark>,
+      );
+    } else {
+      // Bare URL — strip trailing punctuation that the regex permitted but
+      // which is almost certainly part of the surrounding prose.
+      const raw = m[3]!;
+      const trimmed = raw.replace(/[)）」』』.,!?;:]+$/, '');
+      const trailing = raw.slice(trimmed.length);
+      out.push(
+        <a
+          key={key.v++}
+          href={trimmed}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-dl-primary underline decoration-dotted underline-offset-2 break-all hover:opacity-80"
+        >
+          {trimmed}
+        </a>,
+      );
+      if (trailing) {
+        out.push(<Fragment key={key.v++}>{trailing}</Fragment>);
+      }
+    }
+    last = m.index + m[0].length;
   }
-  if (lastIdx < text.length) {
-    out.push(<Fragment key={key++}>{text.slice(lastIdx)}</Fragment>);
+  if (last < text.length) {
+    out.push(<Fragment key={key.v++}>{text.slice(last)}</Fragment>);
   }
   return out;
 }

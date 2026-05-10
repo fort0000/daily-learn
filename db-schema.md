@@ -139,38 +139,44 @@ erDiagram
 ```ts
 type LessonBody = {
   v: 1
-  hero: {
-    theme: string                                    // 例: 'FRAMEWORK · 3C'
-    visual: 'bubbles' | 'chart' | 'icon' | 'none'    // ヒーロー視覚パターン
-  }
   points: [string, string, string]                   // 必ず3個
   blocks: Array<
-    | { type: 'paragraph'; markdown: string }        // 中身は自由 Markdown(==hl==, **bold** OK)
+    | { type: 'heading'; text: string }              // セクション見出し(番号は Renderer が自動付与)
+    | { type: 'paragraph'; markdown: string }        // 200〜500字、3〜5文。==hl==, **bold** OK
     | { type: 'tip'; text: string }                  // 💡 ヒント
     | { type: 'action'; text: string }               // ✅ 今日のアクション
-  >                                                  // 3〜8個。action は必ず1個。tip は最大2個
+  >                                                  // 8〜20個。heading は3〜7個、action は必ず1個、tip は最大4個
+  references: Array<{                                // 本文中で参照した出典(web_search 結果)
+    title: string                                    // ページタイトル/出典名
+    url: string                                      // https:// から始まるフル URL
+  }>                                                 // 1〜8個
 }
 ```
 
+旧バージョン(Phase 5b 以前)では `hero: { theme, visual }` フィールドが含まれていた。Renderer 側では完全に無視されるので、過去の DB 行はそのまま読める(削除も移行も不要)。
+
 **ブロック順 = 表示順**。`blocks` 配列の順番がそのまま画面の上から下に描画される(Renderer 側で並べ替えしない)。
 
-具体例:
+具体例(短縮):
 
 ```json
 {
   "v": 1,
-  "hero": { "theme": "FRAMEWORK · 3C", "visual": "bubbles" },
   "points": [
-    "Customer(顧客)から始める",
-    "自社と競合は「比較」する",
-    "スキマを探す視点を持つ"
+    "3C は Customer→Competitor→Company の順で考える",
+    "顧客の困りごとを3人分、固有名詞レベルで具体化する",
+    "代替手段(無料情報・自作)まで含めて競合を見る"
   ],
   "blocks": [
-    { "type": "paragraph", "markdown": "副業を始めるとき、最初にぶつかる壁は「==誰に何を売るか==」です。**3C** はこの問いに答える最も基本的な道具です。" },
-    { "type": "tip", "text": "順番が大事。Customer → Competitor → Company の順で考えること。" },
-    { "type": "paragraph", "markdown": "顧客のニーズを把握せずに競合を見ても意味がありません。まず「**困っている人**」を3人具体的に思い浮かべるところから始めます。" },
-    { "type": "paragraph", "markdown": "次に競合を見ます。**同じ顧客**を取り合っているのは誰か。直接競合だけでなく、代替手段(YouTube・本など)も含めて広く見ます。" },
-    { "type": "action", "text": "自分が始めたい副業の「想定顧客」を3人、紙に書き出してみる。" }
+    { "type": "paragraph", "markdown": "副業を始めるとき最初にぶつかる壁は「==誰に何を売るか==」です。**3C** はこの問いに答える基本フレームで…(200〜500字)" },
+    { "type": "tip", "text": "順番が大事。Customer → Competitor → Company の順で考える。" },
+    { "type": "paragraph", "markdown": "顧客分析では「困っている人を3人、固有名詞で…(200〜500字)" },
+    { "type": "paragraph", "markdown": "競合分析では…経済産業省『中小企業白書 2024年版』では…(200〜500字)" },
+    { "type": "action", "text": "想定顧客を3人、紙に書き出す(年齢・職業・困りごと・現状の支出/時間)。" }
+  ],
+  "references": [
+    { "title": "3C分析 — Wikipedia", "url": "https://ja.wikipedia.org/wiki/3C%E5%88%86%E6%9E%90" },
+    { "title": "中小企業白書 2024年版 — 中小企業庁", "url": "https://www.chusho.meti.go.jp/pamflet/hakusyo/2024/PDF/chusho/00Hakusyo_zentai.pdf" }
   ]
 }
 ```
@@ -233,10 +239,10 @@ type LessonBody = {
 #### Renderer
 
 `<LessonRenderer body={...} />` が以下を担当:
-- `hero.visual` で分岐してヒーロー描画
 - `points` を「📌 今日の3つのポイント」枠に展開
 - `blocks` を `.map` で順番通りに `<Paragraph>` / `<TipBox>` / `<ActionBox>` に振り分け
-- `paragraph.markdown` 内の `==xxx==`(ハイライト)と `**xxx**`(太字)はミニ MD パーサで `<strong>` に置換
+- `paragraph.markdown` 内の `==xxx==`(ハイライト)と `**xxx**`(太字)はミニ MD パーサで `<mark>`/`<strong>` に置換
+- `references` を末尾に「📎 参考文献」として箇条書き展開(各エントリは新タブで開く `<a>`)
 
 ### `chat_messages` — AIコーチの発言ログ
 

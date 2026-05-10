@@ -93,10 +93,10 @@ export function ProfileScreen() {
     { label: '完了レッスン', value: String(totalCompleted), unit: '本', color: DL.mintDark, bg: '#DCFCE7' },
   ];
   const badges: Badge[] = [
-    { icon: '🎯', label: '目標設定', unlocked: false, color: DL.primary },
-    { icon: '🔥', label: '7日連続', unlocked: false, color: DL.fire },
     { icon: '📚', label: '初学習', unlocked: false, color: DL.mint },
-    { icon: '💎', label: '30日達成', unlocked: false },
+    { icon: '🔥', label: '7日連続', unlocked: false, color: DL.fire },
+    { icon: '💎', label: '30日連続', unlocked: false },
+    { icon: '🌟', label: '50日連続', unlocked: false },
     { icon: '🏆', label: '100日連続', unlocked: false },
   ];
 

@@ -8,7 +8,7 @@ import {
   type TouchEvent as RTouchEvent,
   type MouseEvent as RMouseEvent,
 } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { DL } from '../lib/dl';
 import { useProfile, useSession } from '../lib/auth';
 import { Phone } from '../components/Phone';
@@ -112,6 +112,19 @@ export function HomeScreen() {
   const session = useSession();
   const userId = session.session?.user.id ?? null;
   const { profile } = useProfile(userId);
+  const location = useLocation();
+  const navigate = useNavigate();
+  // Article → CompleteModal → /home passes the just-completed course's id via
+  // location.state so we can land on its carousel slot. Read once and clear so
+  // back-navigation doesn't keep re-focusing the same course.
+  const focusCourseId =
+    (location.state as { focusCourseId?: string } | null)?.focusCourseId ?? null;
+  useEffect(() => {
+    if (focusCourseId) {
+      navigate(location.pathname, { replace: true, state: null });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   // Cards lazy-init from cache so Article → Home and Roadmap → Home don't
   // flash the carousel skeleton when we already know the answer.
   const [cards, setCards] = useState<CourseCard[] | null>(() => buildCardsFromCache());
@@ -185,7 +198,7 @@ export function HomeScreen() {
       ) : cards.length === 0 ? (
         <EmptyCarousel />
       ) : (
-        <LessonCarousel cards={cards} onChanged={load} />
+        <LessonCarousel cards={cards} onChanged={load} focusCourseId={focusCourseId} />
       )}
 
       <div className="pt-[18px] px-5">
@@ -289,8 +302,23 @@ function EmptyCarousel() {
   );
 }
 
-function LessonCarousel({ cards, onChanged }: { cards: CourseCard[]; onChanged: () => void }) {
-  const [idx, setIdx] = useState(0);
+function LessonCarousel({
+  cards,
+  onChanged,
+  focusCourseId,
+}: {
+  cards: CourseCard[];
+  onChanged: () => void;
+  focusCourseId: string | null;
+}) {
+  // Initial idx prefers the just-completed course (passed in via location
+  // state from CompleteModal). Falls back to 0 when the id isn't in the
+  // current cards list (course archived, gated by plan, etc.).
+  const [idx, setIdx] = useState(() => {
+    if (!focusCourseId) return 0;
+    const i = cards.findIndex((c) => c.course.id === focusCourseId);
+    return i >= 0 ? i : 0;
+  });
   const [shift, setShift] = useState(0);
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const trackRef = useRef<HTMLDivElement | null>(null);

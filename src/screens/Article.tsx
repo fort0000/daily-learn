@@ -371,7 +371,9 @@ export function ArticleScreen() {
           title={lesson.title}
           streak={completeModal.streak}
           daysCompleted={completeModal.daysCompleted}
-          onClose={() => navigate('/home')}
+          onClose={() =>
+            navigate('/home', { state: { focusCourseId: lesson.course_id } })
+          }
         />
       )}
     </Phone>

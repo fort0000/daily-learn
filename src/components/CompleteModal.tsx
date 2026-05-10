@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { DL } from '../lib/dl';
 import { Flame } from './Flame';
+import { PushButton } from './PushButton';
 
 type Props = {
   day: number;
@@ -226,38 +227,6 @@ export function CompleteModal({
           overflow: 'hidden',
         }}
       >
-        {/* close */}
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="閉じる"
-          style={{
-            position: 'absolute',
-            top: 12,
-            right: 12,
-            width: 32,
-            height: 32,
-            borderRadius: 999,
-            background: '#F5EDDF',
-            border: 'none',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'pointer',
-            zIndex: 10,
-            padding: 0,
-          }}
-        >
-          <svg width="12" height="12" viewBox="0 0 12 12">
-            <path
-              d="M3 3 L9 9 M9 3 L3 9"
-              stroke={DL.slate}
-              strokeWidth="2.2"
-              strokeLinecap="round"
-            />
-          </svg>
-        </button>
-
         {/* Trophy stage */}
         <div
           style={{
@@ -699,6 +668,25 @@ export function CompleteModal({
               }}
             />
           </div>
+        </div>
+
+        <div
+          style={{
+            marginTop: 16,
+            opacity: stage >= 5 ? 1 : 0,
+            transition: 'opacity 280ms ease 120ms',
+            pointerEvents: stage >= 5 ? 'auto' : 'none',
+          }}
+        >
+          <PushButton
+            color={DL.mint}
+            shadow={DL.mintShadow}
+            fontSize={15}
+            height={52}
+            onClick={onClose}
+          >
+            ホームに戻る
+          </PushButton>
         </div>
       </div>
     </div>

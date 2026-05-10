@@ -232,6 +232,20 @@ async function throwIfPlanLimit(err: unknown): Promise<void> {
   }
 }
 
+// In-memory body cache. Lesson bodies are immutable once generated, so we can
+// keep them around for the SPA session and avoid re-fetching on every Article
+// remount (e.g. when returning from /chat). Cleared by clearLessonBodyCache on
+// logout / course delete.
+const lessonBodyCache = new Map<string, unknown>();
+
+export function getCachedLessonBody(lessonId: string): unknown | undefined {
+  return lessonBodyCache.get(lessonId);
+}
+
+export function clearLessonBodyCache(): void {
+  lessonBodyCache.clear();
+}
+
 // On-demand lesson body generation. Idempotent: if body is already non-null,
 // the Edge Function returns it without calling Anthropic.
 //
@@ -256,6 +270,7 @@ export function requestLessonGeneration(lessonId: string): Promise<unknown> {
       throw error;
     }
     if (!data?.body) throw new Error('lessons-generate returned no body');
+    lessonBodyCache.set(lessonId, data.body);
     return data.body;
   })().finally(() => {
     inflightGenerations.delete(lessonId);
@@ -267,17 +282,35 @@ export function requestLessonGeneration(lessonId: string): Promise<unknown> {
 
 // Read-only body fetch. Used by the Article screen on every open since the
 // `body` column is REVOKE'd from authenticated. Same plan gate as
-// lessons-generate, but never calls Anthropic.
-export async function requestLessonRead(lessonId: string): Promise<unknown | null> {
-  const { data, error } = await supabase.functions.invoke<{ body: unknown | null }>(
-    'lessons-read',
-    { body: { lesson_id: lessonId } },
-  );
-  if (error) {
-    await throwIfPlanLimit(error);
-    throw error;
-  }
-  return data?.body ?? null;
+// lessons-generate, but never calls Anthropic. Hits the in-memory cache when
+// available so a Chat ↔ Article round-trip doesn't re-invoke the function.
+const inflightReads = new Map<string, Promise<unknown | null>>();
+
+export function requestLessonRead(lessonId: string): Promise<unknown | null> {
+  const cached = lessonBodyCache.get(lessonId);
+  if (cached !== undefined) return Promise.resolve(cached);
+
+  const existing = inflightReads.get(lessonId);
+  if (existing) return existing;
+
+  const promise = (async () => {
+    const { data, error } = await supabase.functions.invoke<{ body: unknown | null }>(
+      'lessons-read',
+      { body: { lesson_id: lessonId } },
+    );
+    if (error) {
+      await throwIfPlanLimit(error);
+      throw error;
+    }
+    const body = data?.body ?? null;
+    if (body !== null) lessonBodyCache.set(lessonId, body);
+    return body;
+  })().finally(() => {
+    inflightReads.delete(lessonId);
+  });
+
+  inflightReads.set(lessonId, promise);
+  return promise;
 }
 
 // Fire-and-forget after markLessonComplete. The Edge Function checks the

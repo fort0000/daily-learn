@@ -9,6 +9,7 @@ import { LessonRenderer } from '../components/LessonRenderer';
 import {
   PlanLimitError,
   fetchLesson,
+  getCachedLessonBody,
   markLessonComplete,
   requestLessonGeneration,
   requestLessonPrefetchNext,
@@ -46,6 +47,15 @@ export function ArticleScreen() {
     fetchLesson(lessonId)
       .then((l) => {
         if (!active) return;
+        // Hydrate body from the in-memory cache so a Chat ↔ Article round-trip
+        // doesn't flash the "loading" placeholder while requestLessonRead races.
+        if (l) {
+          const cached = getCachedLessonBody(l.id);
+          if (cached !== undefined) {
+            setLesson({ ...l, body: cached });
+            return;
+          }
+        }
         setLesson(l);
       })
       .catch((e) => {

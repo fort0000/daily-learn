@@ -6,11 +6,14 @@ import { StatusBar } from '../components/StatusBar';
 import { TabBar } from '../components/TabBar';
 import { PushButton } from '../components/PushButton';
 import { LessonRenderer } from '../components/LessonRenderer';
+import { CompleteModal } from '../components/CompleteModal';
 import { ChatScreen } from './Chat';
 import {
   PlanLimitError,
   fetchLesson,
+  fetchTotalCompleted,
   getCachedLessonBody,
+  getStreak,
   markLessonComplete,
   requestLessonGeneration,
   requestLessonPrefetchNext,
@@ -51,6 +54,10 @@ export function ArticleScreen() {
   const [actuallyGenerating, setActuallyGenerating] = useState(false);
   const [completing, setCompleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [completeModal, setCompleteModal] = useState<{
+    streak: number;
+    daysCompleted: number;
+  } | null>(null);
 
   useEffect(() => {
     if (!lessonId) {
@@ -155,7 +162,22 @@ export function ArticleScreen() {
       await markLessonComplete(lesson.id);
       // Fire-and-forget — server-side checks frontier conditions itself.
       void requestLessonPrefetchNext(lesson.id);
-      navigate('/home');
+      // Reflect the new completed_at locally so the button state is correct
+      // if the user closes the modal back to the article instead of going home.
+      setLesson((prev) =>
+        prev ? { ...prev, completed_at: new Date().toISOString() } : prev,
+      );
+      // Best-effort stats fetch for the celebration. If it fails, fall back
+      // to lesson.day so the modal still has reasonable numbers.
+      const [streakRes, totalRes] = await Promise.allSettled([
+        getStreak(),
+        fetchTotalCompleted(),
+      ]);
+      const streak =
+        streakRes.status === 'fulfilled' ? streakRes.value.current : lesson.day;
+      const daysCompleted =
+        totalRes.status === 'fulfilled' ? totalRes.value : lesson.day;
+      setCompleteModal({ streak, daysCompleted });
     } catch (e) {
       console.error('[Article] markLessonComplete failed:', e);
       setError(e instanceof Error ? e.message : '完了の記録に失敗しました');
@@ -343,6 +365,16 @@ export function ArticleScreen() {
       `}</style>
 
       <TabBar active="home" />
+
+      {completeModal && lesson && (
+        <CompleteModal
+          day={lesson.day}
+          title={lesson.title}
+          streak={completeModal.streak}
+          daysCompleted={completeModal.daysCompleted}
+          onClose={() => navigate('/home')}
+        />
+      )}
     </Phone>
   );
 }

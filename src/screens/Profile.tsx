@@ -4,7 +4,6 @@ import { DL } from '../lib/dl';
 import { Phone } from '../components/Phone';
 import { StatusBar } from '../components/StatusBar';
 import { TabBar } from '../components/TabBar';
-import { AppIcon } from '../components/AppIcon';
 import { Flame } from '../components/Flame';
 import { resolveDisplayName, signOut, useProfile, useSession } from '../lib/auth';
 import { fetchTotalCompleted, getStreak } from '../lib/db';
@@ -116,11 +115,8 @@ export function ProfileScreen() {
     <Phone>
       <StatusBar />
       <div className="absolute top-4 bottom-0 left-0 right-0 overflow-y-auto pb-6">
-        <div className="pt-1 px-5 pr-[76px] flex items-center gap-3">
-          <AppIcon size={60} rounded="rounded-2xl" />
-          <div>
-            <div className="text-[17px] font-black text-dl-navy font-jp">{displayName}</div>
-          </div>
+        <div className="pt-1 px-5 pr-[76px]">
+          <div className="text-[17px] font-black text-dl-navy font-jp">{displayName}</div>
         </div>
 
         {profileError && (
@@ -210,7 +206,21 @@ export function ProfileScreen() {
             className="px-3.5 py-3 flex items-center gap-3 cursor-pointer"
             onClick={() => navigate('/upgrade')}
           >
-            <div className="px-2.5 py-1 rounded-full text-[11px] font-black font-jp text-[#78350F] bg-gradient-to-r from-dl-yellow to-[#F59E0B]">
+            <div
+              className="px-2.5 py-1 rounded-full text-[11px] font-black font-jp"
+              style={
+                profile?.plan === 'paid'
+                  ? {
+                      color: '#FFD7B5',
+                      backgroundImage: [
+                        'radial-gradient(circle at 100% 0%, rgba(255,122,69,0.55) 0%, transparent 70%)',
+                        'linear-gradient(135deg, #1B2540 0%, #0F172A 55%, #2A1810 100%)',
+                      ].join(', '),
+                      border: `1px solid ${DL.primary}`,
+                    }
+                  : { color: '#78350F', background: 'linear-gradient(90deg, #FACC15 0%, #F59E0B 100%)' }
+              }
+            >
               {planLabel}
             </div>
             <div className="flex-1" />

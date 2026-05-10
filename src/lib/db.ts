@@ -83,12 +83,84 @@ export async function fetchLesson(lessonId: string): Promise<Lesson | null> {
 // Mark a lesson complete. The RLS policy on `lessons` already enforces
 // "completed_at IS NULL" + ownership, so re-completion is a no-op (0 rows).
 export async function markLessonComplete(lessonId: string): Promise<void> {
+  const completedAt = new Date().toISOString();
   const { error } = await supabase
     .from('lessons')
-    .update({ completed_at: new Date().toISOString() })
+    .update({ completed_at: completedAt })
     .eq('id', lessonId)
     .is('completed_at', null);
   if (error) throw error;
+  patchCachedLessonCompletion(lessonId, completedAt);
+}
+
+// ----- Roadmap cache: keep (course, lessons[]) in memory across screen mounts.
+// While a course is in 'active' status its lesson rows are effectively
+// immutable from the user's side — only `completed_at` flips, and only by
+// markLessonComplete which patches the cache locally. So once a course's
+// roadmap is loaded we can serve subsequent Home ↔ Roadmap navigations from
+// cache and skip the loading flash entirely. Invalidation:
+//   - Realtime course event (status flip, archive, new course) — handled in
+//     subscribeToCourses below
+//   - archiveCourse (explicit user action)
+//   - signOut → clearRoadmapCache
+type CourseLessons = { course: Course; lessons: Lesson[] };
+
+let activeCoursesCache: Course[] | null = null;
+const courseLessonsCache = new Map<string, CourseLessons>();
+
+export function getCachedActiveCourses(): Course[] | null {
+  return activeCoursesCache;
+}
+
+export function getCachedCourseLessons(courseId: string): CourseLessons | null {
+  return courseLessonsCache.get(courseId) ?? null;
+}
+
+// Cached variants of the basic fetchers. Return cache hit synchronously
+// (well, as a resolved promise) when available; otherwise fetch and populate.
+export async function fetchActiveCoursesCached(): Promise<Course[]> {
+  if (activeCoursesCache) return activeCoursesCache;
+  const fresh = await fetchActiveCourses();
+  activeCoursesCache = fresh;
+  return fresh;
+}
+
+export async function fetchCourseCached(courseId: string): Promise<Course | null> {
+  const cached = courseLessonsCache.get(courseId)?.course;
+  if (cached) return cached;
+  return fetchCourse(courseId);
+}
+
+export async function fetchLessonsByCourseCached(course: Course): Promise<Lesson[]> {
+  const cached = courseLessonsCache.get(course.id);
+  if (cached) return cached.lessons;
+  const fresh = await fetchLessonsByCourse(course.id);
+  courseLessonsCache.set(course.id, { course, lessons: fresh });
+  return fresh;
+}
+
+export function clearRoadmapCache(): void {
+  activeCoursesCache = null;
+  courseLessonsCache.clear();
+}
+
+function patchCachedLessonCompletion(
+  lessonId: string,
+  completedAt: string | null,
+): void {
+  for (const entry of courseLessonsCache.values()) {
+    const idx = entry.lessons.findIndex((l) => l.id === lessonId);
+    if (idx === -1) continue;
+    const lessons = entry.lessons.slice();
+    lessons[idx] = { ...lessons[idx]!, completed_at: completedAt };
+    courseLessonsCache.set(entry.course.id, { course: entry.course, lessons });
+    return;
+  }
+}
+
+function invalidateCourseCache(courseId: string): void {
+  courseLessonsCache.delete(courseId);
+  activeCoursesCache = null;
 }
 
 // Returns rows of `{ completed_at }` for the caller's lessons within the last
@@ -172,6 +244,11 @@ export function subscribeToCourses(
       (payload: { eventType: string; new: unknown; old: unknown }) => {
         const event = payload.eventType as CourseChangeEvent;
         const row = (event === 'DELETE' ? payload.old : payload.new) as Course | null;
+        // Drop cached roadmap data so the consumer's load() returns fresh
+        // rows. Status flips (generating → active), inserts, and archives all
+        // route through here.
+        if (row?.id) courseLessonsCache.delete(row.id);
+        activeCoursesCache = null;
         onChange(row, event);
       },
     )
@@ -189,6 +266,7 @@ export async function archiveCourse(courseId: string): Promise<void> {
     .update({ status: 'archived' })
     .eq('id', courseId);
   if (error) throw error;
+  invalidateCourseCache(courseId);
 }
 
 // ----- Phase 5: lesson body generation + prefetch + chat -----

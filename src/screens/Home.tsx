@@ -18,9 +18,11 @@ import { Flame } from '../components/Flame';
 import { PushButton } from '../components/PushButton';
 import {
   archiveCourse,
-  fetchActiveCourses,
-  fetchLessonsByCourse,
+  fetchActiveCoursesCached,
+  fetchLessonsByCourseCached,
   fetchRecentCompletions,
+  getCachedActiveCourses,
+  getCachedCourseLessons,
   getStreak,
   startCourseGeneration,
   subscribeToCourses,
@@ -67,18 +69,59 @@ type CourseCard = {
   palette: Palette;
 };
 
+function buildCards(courses: Course[], lessonsByCourse: Map<string, Lesson[]>): CourseCard[] {
+  const built: CourseCard[] = [];
+  courses.forEach((course) => {
+    const lessons = lessonsByCourse.get(course.id) ?? [];
+    const next = lessons.find((l) => l.completed_at == null) ?? null;
+    // For 'active' courses with every lesson completed, we have nothing
+    // useful to show — skip the card entirely. Generating/failed always
+    // surface so the user can see progress / retry.
+    if (course.status === 'active' && !next) return;
+    const lockedDay = nextLockedDay(lessons);
+    built.push({
+      course,
+      lesson: next,
+      locked: !!next && lockedDay === next.day,
+      palette: PALETTES[built.length % PALETTES.length]!,
+    });
+  });
+  return built;
+}
+
+// Lazy-init helper. Returns a fully-built carousel when both `activeCourses`
+// and every needed `courseLessons` entry are already in cache; otherwise
+// returns null so the screen falls back to the loading skeleton.
+function buildCardsFromCache(): CourseCard[] | null {
+  const courses = getCachedActiveCourses();
+  if (!courses) return null;
+  const map = new Map<string, Lesson[]>();
+  for (const c of courses) {
+    if (c.status !== 'active' && c.status !== 'completed') {
+      map.set(c.id, []);
+      continue;
+    }
+    const cached = getCachedCourseLessons(c.id);
+    if (!cached) return null;
+    map.set(c.id, cached.lessons);
+  }
+  return buildCards(courses, map);
+}
+
 export function HomeScreen() {
   const session = useSession();
   const userId = session.session?.user.id ?? null;
   const { profile } = useProfile(userId);
-  const [cards, setCards] = useState<CourseCard[] | null>(null);
+  // Cards lazy-init from cache so Article → Home and Roadmap → Home don't
+  // flash the carousel skeleton when we already know the answer.
+  const [cards, setCards] = useState<CourseCard[] | null>(() => buildCardsFromCache());
   const [streak, setStreak] = useState({ current: 0, longest: 0 });
   const [completedSet, setCompletedSet] = useState<Set<string>>(() => new Set());
 
   const load = useCallback(async () => {
     try {
       const [courses, completions, s] = await Promise.all([
-        fetchActiveCourses(),
+        fetchActiveCoursesCached(),
         fetchRecentCompletions(8),
         getStreak(),
       ]);
@@ -88,27 +131,13 @@ export function HomeScreen() {
       const lessonLists = await Promise.all(
         courses.map((c) =>
           c.status === 'active' || c.status === 'completed'
-            ? fetchLessonsByCourse(c.id)
+            ? fetchLessonsByCourseCached(c)
             : Promise.resolve<Lesson[]>([]),
         ),
       );
-      const built: CourseCard[] = [];
-      courses.forEach((course, i) => {
-        const lessons = lessonLists[i] ?? [];
-        const next = lessons.find((l) => l.completed_at == null) ?? null;
-        // For 'active' courses with every lesson completed, we have nothing
-        // useful to show — skip the card entirely. Generating/failed always
-        // surface so the user can see progress / retry.
-        if (course.status === 'active' && !next) return;
-        const lockedDay = nextLockedDay(lessons);
-        built.push({
-          course,
-          lesson: next,
-          locked: !!next && lockedDay === next.day,
-          palette: PALETTES[built.length % PALETTES.length]!,
-        });
-      });
-      setCards(built);
+      const map = new Map<string, Lesson[]>();
+      courses.forEach((c, i) => map.set(c.id, lessonLists[i] ?? []));
+      setCards(buildCards(courses, map));
     } catch (e) {
       console.error('[Home] load failed:', e);
       setCards([]);

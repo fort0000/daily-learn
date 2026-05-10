@@ -6,9 +6,11 @@ import { Phone } from '../components/Phone';
 import { StatusBar } from '../components/StatusBar';
 import { TabBar } from '../components/TabBar';
 import {
-  fetchActiveCourses,
-  fetchCourse,
-  fetchLessonsByCourse,
+  fetchActiveCoursesCached,
+  fetchCourseCached,
+  fetchLessonsByCourseCached,
+  getCachedActiveCourses,
+  getCachedCourseLessons,
   subscribeToCourses,
   type Course,
   type Lesson,
@@ -28,22 +30,29 @@ export function RoadmapScreen() {
   const [searchParams] = useSearchParams();
   const courseIdParam = searchParams.get('courseId');
 
-  const [course, setCourse] = useState<Course | null>(null);
-  const [lessons, setLessons] = useState<Lesson[] | null>(null);
+  // Lazy-init from the in-memory roadmap cache so navigating Home → Roadmap
+  // mid-session doesn't flash a loading state. Cache is invalidated on
+  // Realtime course changes, archive, and signOut.
+  const [course, setCourse] = useState<Course | null>(() =>
+    initialCourseFromCache(courseIdParam),
+  );
+  const [lessons, setLessons] = useState<Lesson[] | null>(() =>
+    initialLessonsFromCache(courseIdParam),
+  );
 
   const load = useCallback(async () => {
     try {
       // Caller didn't pin a course → land on the most recent active one.
       const c = courseIdParam
-        ? await fetchCourse(courseIdParam)
-        : (await fetchActiveCourses())[0] ?? null;
+        ? await fetchCourseCached(courseIdParam)
+        : (await fetchActiveCoursesCached())[0] ?? null;
       setCourse(c);
       if (!c || c.status !== 'active') {
         // Generating / failed / no-course: nothing to show in the 30 cells yet.
         setLessons([]);
         return;
       }
-      const ls = await fetchLessonsByCourse(c.id);
+      const ls = await fetchLessonsByCourseCached(c);
       setLessons(ls);
     } catch (e) {
       console.error('[Roadmap] load failed:', e);
@@ -159,6 +168,18 @@ export function RoadmapScreen() {
       <TabBar active="home" />
     </Phone>
   );
+}
+
+function initialCourseFromCache(courseIdParam: string | null): Course | null {
+  if (courseIdParam) return getCachedCourseLessons(courseIdParam)?.course ?? null;
+  return getCachedActiveCourses()?.[0] ?? null;
+}
+
+function initialLessonsFromCache(courseIdParam: string | null): Lesson[] | null {
+  if (courseIdParam) return getCachedCourseLessons(courseIdParam)?.lessons ?? null;
+  const first = getCachedActiveCourses()?.[0];
+  if (!first) return null;
+  return getCachedCourseLessons(first.id)?.lessons ?? null;
 }
 
 // Build 30 cells from the lesson rows. The "current" day is the lowest day

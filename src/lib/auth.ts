@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from './supabase';
-import { clearLessonBodyCache } from './db';
+import { clearLessonBodyCache, clearRoadmapCache } from './db';
 
 export type Profile = {
   id: string;
@@ -54,6 +54,7 @@ export const signOut = async () => {
   // Drop the in-memory lesson body cache so the next user (or re-login) doesn't
   // see stale content.
   clearLessonBodyCache();
+  clearRoadmapCache();
   return supabase.auth.signOut();
 };
 

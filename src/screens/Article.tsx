@@ -3,7 +3,6 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { DL } from '../lib/dl';
 import { Phone } from '../components/Phone';
 import { StatusBar } from '../components/StatusBar';
-import { TabBar } from '../components/TabBar';
 import { PushButton } from '../components/PushButton';
 import { LessonRenderer } from '../components/LessonRenderer';
 import { CompleteModal } from '../components/CompleteModal';
@@ -274,7 +273,7 @@ export function ArticleScreen() {
           else openChat();
         }}
         title={chatVisible ? 'レッスンに戻る' : 'AIアシスタントに質問'}
-        className={`absolute bottom-6 right-[18px] z-[60] w-[58px] h-[58px] rounded-full flex items-center justify-center ${
+        className={`absolute bottom-[92px] right-[18px] z-[60] w-[58px] h-[58px] rounded-full flex items-center justify-center ${
           lesson ? 'cursor-pointer' : 'opacity-50 cursor-not-allowed pointer-events-none'
         }`}
         style={{
@@ -339,17 +338,17 @@ export function ArticleScreen() {
           className="absolute inset-0 z-[55]"
           style={{
             clipPath: chatVisible
-              ? 'circle(140% at calc(100% - 47px) calc(100% - 53px))'
-              : 'circle(0px at calc(100% - 47px) calc(100% - 53px))',
+              ? 'circle(140% at calc(100% - 47px) calc(100% - 121px))'
+              : 'circle(0px at calc(100% - 47px) calc(100% - 121px))',
             WebkitClipPath: chatVisible
-              ? 'circle(140% at calc(100% - 47px) calc(100% - 53px))'
-              : 'circle(0px at calc(100% - 47px) calc(100% - 53px))',
+              ? 'circle(140% at calc(100% - 47px) calc(100% - 121px))'
+              : 'circle(0px at calc(100% - 47px) calc(100% - 121px))',
             transition:
               'clip-path 460ms cubic-bezier(.4,0,.2,1), -webkit-clip-path 460ms cubic-bezier(.4,0,.2,1)',
             pointerEvents: chatVisible ? 'auto' : 'none',
           }}
         >
-          <ChatScreen embeddedLessonId={lesson.id} onClose={closeChat} />
+          <ChatScreen embeddedLessonId={lesson.id} />
         </div>
       )}
 
@@ -363,8 +362,6 @@ export function ArticleScreen() {
           100% { transform: scale(1.5); opacity: 0; }
         }
       `}</style>
-
-      <TabBar active="home" />
 
       {completeModal && lesson && (
         <CompleteModal

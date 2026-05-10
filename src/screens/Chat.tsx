@@ -15,13 +15,12 @@ import { useProfile, useSession } from '../lib/auth';
 
 type Props = {
   // When provided, the screen runs in "embedded" mode: it uses the given
-  // lesson id directly, the back button calls onClose instead of routing,
-  // and the TabBar is hidden (the host page provides chrome).
+  // lesson id directly, hides the in-screen back button, and hides the
+  // TabBar (the host page provides chrome).
   embeddedLessonId?: string;
-  onClose?: () => void;
 };
 
-export function ChatScreen({ embeddedLessonId, onClose }: Props = {}) {
+export function ChatScreen({ embeddedLessonId }: Props = {}) {
   const navigate = useNavigate();
   const params = useParams();
   const embedded = embeddedLessonId !== undefined;
@@ -115,28 +114,26 @@ export function ChatScreen({ embeddedLessonId, onClose }: Props = {}) {
     <Phone bg="#FFFBF5">
       <StatusBar />
       <div className={`pt-1 px-4 pb-3 ${embedded ? '' : 'pr-[76px]'} flex items-center gap-3 border-b border-dl-border`}>
-        <div
-          onClick={() => {
-            if (embedded) {
-              onClose?.();
-              return;
-            }
-            if (lessonId) navigate(`/lessons/${lessonId}`, { replace: true });
-            else navigate(-1);
-          }}
-          className="w-[38px] h-[38px] rounded-xl bg-white border-[1.5px] border-dl-border flex items-center justify-center cursor-pointer shrink-0"
-        >
-          <svg width="16" height="16" viewBox="0 0 16 16">
-            <path
-              d="M10 3 L4 8 L10 13"
-              stroke={DL.navy}
-              strokeWidth="2.4"
-              fill="none"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </div>
+        {!embedded && (
+          <div
+            onClick={() => {
+              if (lessonId) navigate(`/lessons/${lessonId}`, { replace: true });
+              else navigate(-1);
+            }}
+            className="w-[38px] h-[38px] rounded-xl bg-white border-[1.5px] border-dl-border flex items-center justify-center cursor-pointer shrink-0"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16">
+              <path
+                d="M10 3 L4 8 L10 13"
+                stroke={DL.navy}
+                strokeWidth="2.4"
+                fill="none"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </div>
+        )}
         <AppIcon size={44} rounded="rounded-2xl" />
         <div className="flex-1 min-w-0">
           <div className="text-sm font-black text-dl-navy font-jp">AIアシスタント</div>

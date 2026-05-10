@@ -29,6 +29,10 @@ export function ArticleScreen() {
   const [lesson, setLesson] = useState<Lesson | null>(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+  // True only while requestLessonGeneration is running (body was actually
+  // missing). During requestLessonRead we still show a placeholder, but the
+  // copy is "loading" rather than "generating".
+  const [actuallyGenerating, setActuallyGenerating] = useState(false);
   const [completing, setCompleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -74,6 +78,7 @@ export function ArticleScreen() {
     if (profile?.plan === 'free' && lesson.day > 10) return; // gate redirect handles this
     let active = true;
     setGenerating(true);
+    setActuallyGenerating(false);
     setError(null);
 
     const handlePlanLimit = (e: PlanLimitError) => {
@@ -94,6 +99,7 @@ export function ArticleScreen() {
           return;
         }
         // body is null in the DB — kick generation.
+        if (active) setActuallyGenerating(true);
         const generated = await requestLessonGeneration(lesson.id);
         if (!active) return;
         setLesson((prev) =>
@@ -106,7 +112,10 @@ export function ArticleScreen() {
         if (active) setError(e instanceof Error ? e.message : '本文の取得に失敗しました');
       })
       .finally(() => {
-        if (active) setGenerating(false);
+        if (active) {
+          setGenerating(false);
+          setActuallyGenerating(false);
+        }
       });
     return () => {
       active = false;
@@ -172,7 +181,12 @@ export function ArticleScreen() {
         ) : !lesson ? (
           <NotFound onBack={() => navigate('/home')} />
         ) : (
-          <ArticleBody lesson={lesson} body={body} generating={generating} />
+          <ArticleBody
+            lesson={lesson}
+            body={body}
+            generating={generating}
+            actuallyGenerating={actuallyGenerating}
+          />
         )}
 
         {error && (
@@ -224,10 +238,12 @@ function ArticleBody({
   lesson,
   body,
   generating,
+  actuallyGenerating,
 }: {
   lesson: Lesson;
   body: LessonBody | null;
   generating: boolean;
+  actuallyGenerating: boolean;
 }) {
   return (
     <>
@@ -239,7 +255,7 @@ function ArticleBody({
       {body ? (
         <LessonRenderer body={body} />
       ) : generating ? (
-        <Generating summary={lesson.summary} />
+        <Generating summary={lesson.summary} actuallyGenerating={actuallyGenerating} />
       ) : (
         // Body load failed (e.g. non-LessonBody legacy JSON or generation
         // error). Show summary so the user has something while we retry.
@@ -252,7 +268,13 @@ function ArticleBody({
   );
 }
 
-function Generating({ summary }: { summary: string }) {
+function Generating({
+  summary,
+  actuallyGenerating,
+}: {
+  summary: string;
+  actuallyGenerating: boolean;
+}) {
   return (
     <>
       <div className="bg-white rounded-[18px] px-4 py-3.5 border-[1.5px] border-dl-border mb-3.5">
@@ -272,7 +294,7 @@ function Generating({ summary }: { summary: string }) {
           />
         </div>
         <div className="text-[12px] font-extrabold text-dl-fire-dark font-jp leading-[1.5]">
-          本文を生成中…(約20〜30秒)
+          {actuallyGenerating ? 'レッスンを生成中…(約20〜30秒)' : 'レッスンを生成中…'}
         </div>
       </div>
     </>

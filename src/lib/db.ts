@@ -234,12 +234,30 @@ async function throwIfPlanLimit(err: unknown): Promise<void> {
 
 // In-memory body cache. Lesson bodies are immutable once generated, so we can
 // keep them around for the SPA session and avoid re-fetching on every Article
-// remount (e.g. when returning from /chat). Cleared by clearLessonBodyCache on
-// logout / course delete.
+// remount (e.g. when returning from /chat). LRU-capped so memory doesn't grow
+// unbounded as the user works through multiple courses; Map preserves insertion
+// order, so we evict the oldest key when we exceed the limit and re-insert on
+// hit to refresh recency. Cleared by clearLessonBodyCache on logout.
+const LESSON_BODY_CACHE_MAX = 10;
 const lessonBodyCache = new Map<string, unknown>();
 
+function setCachedLessonBody(lessonId: string, body: unknown): void {
+  if (lessonBodyCache.has(lessonId)) lessonBodyCache.delete(lessonId);
+  lessonBodyCache.set(lessonId, body);
+  while (lessonBodyCache.size > LESSON_BODY_CACHE_MAX) {
+    const oldest = lessonBodyCache.keys().next().value;
+    if (oldest === undefined) break;
+    lessonBodyCache.delete(oldest);
+  }
+}
+
 export function getCachedLessonBody(lessonId: string): unknown | undefined {
-  return lessonBodyCache.get(lessonId);
+  const body = lessonBodyCache.get(lessonId);
+  if (body === undefined) return undefined;
+  // Refresh LRU recency on hit.
+  lessonBodyCache.delete(lessonId);
+  lessonBodyCache.set(lessonId, body);
+  return body;
 }
 
 export function clearLessonBodyCache(): void {
@@ -270,7 +288,7 @@ export function requestLessonGeneration(lessonId: string): Promise<unknown> {
       throw error;
     }
     if (!data?.body) throw new Error('lessons-generate returned no body');
-    lessonBodyCache.set(lessonId, data.body);
+    setCachedLessonBody(lessonId, data.body);
     return data.body;
   })().finally(() => {
     inflightGenerations.delete(lessonId);
@@ -287,7 +305,7 @@ export function requestLessonGeneration(lessonId: string): Promise<unknown> {
 const inflightReads = new Map<string, Promise<unknown | null>>();
 
 export function requestLessonRead(lessonId: string): Promise<unknown | null> {
-  const cached = lessonBodyCache.get(lessonId);
+  const cached = getCachedLessonBody(lessonId);
   if (cached !== undefined) return Promise.resolve(cached);
 
   const existing = inflightReads.get(lessonId);
@@ -303,7 +321,7 @@ export function requestLessonRead(lessonId: string): Promise<unknown | null> {
       throw error;
     }
     const body = data?.body ?? null;
-    if (body !== null) lessonBodyCache.set(lessonId, body);
+    if (body !== null) setCachedLessonBody(lessonId, body);
     return body;
   })().finally(() => {
     inflightReads.delete(lessonId);

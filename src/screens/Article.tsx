@@ -294,7 +294,7 @@ function Generating({
           />
         </div>
         <div className="text-[12px] font-extrabold text-dl-fire-dark font-jp leading-[1.5]">
-          {actuallyGenerating ? 'レッスンを生成中…(約20〜30秒)' : 'レッスンを生成中…'}
+          {actuallyGenerating ? 'レッスンを生成中…(約20〜30秒)' : 'レッスンをロード中…'}
         </div>
       </div>
     </>

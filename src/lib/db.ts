@@ -357,23 +357,70 @@ export function requestLessonGeneration(lessonId: string): Promise<unknown> {
   if (existing) return existing;
 
   const promise = (async () => {
-    const { data, error } = await supabase.functions.invoke<{ body: unknown }>(
-      'lessons-generate',
-      { body: { lesson_id: lessonId } },
-    );
-    if (error) {
-      await throwIfPlanLimit(error);
-      throw error;
+    let invokeError: unknown = null;
+    try {
+      const { data, error } = await supabase.functions.invoke<{ body: unknown }>(
+        'lessons-generate',
+        { body: { lesson_id: lessonId } },
+      );
+      if (error) {
+        await throwIfPlanLimit(error);
+        invokeError = error;
+      } else if (data?.body) {
+        setCachedLessonBody(lessonId, data.body);
+        return data.body;
+      } else {
+        invokeError = new Error('lessons-generate returned no body');
+      }
+    } catch (e) {
+      // throwIfPlanLimit already re-threw the PlanLimitError above; anything
+      // reaching here is a transport/runtime failure we can try to recover from.
+      await throwIfPlanLimit(e);
+      invokeError = e;
     }
-    if (!data?.body) throw new Error('lessons-generate returned no body');
-    setCachedLessonBody(lessonId, data.body);
-    return data.body;
+
+    // The most common reason for `invokeError` here is the Supabase Edge
+    // gateway killing the HTTP request before the Anthropic call finished —
+    // but the function itself may have completed and written `lessons.body`.
+    // Re-opening the lesson reveals the row, so poll `lessons-read` for a
+    // window to recover the body before surfacing the error.
+    const polled = await pollLessonBodyOnce(lessonId, 90_000);
+    if (polled !== null) {
+      setCachedLessonBody(lessonId, polled);
+      return polled;
+    }
+    throw invokeError ?? new Error('lessons-generate failed');
   })().finally(() => {
     inflightGenerations.delete(lessonId);
   });
 
   inflightGenerations.set(lessonId, promise);
   return promise;
+}
+
+// Poll `lessons-read` with backoff until the body becomes available or the
+// time budget is exhausted. Bypasses the in-memory cache and the dedup map
+// so successive polls actually hit the Edge Function.
+async function pollLessonBodyOnce(
+  lessonId: string,
+  maxMs: number,
+): Promise<unknown | null> {
+  const start = Date.now();
+  let delay = 1500;
+  while (Date.now() - start < maxMs) {
+    await new Promise((r) => setTimeout(r, delay));
+    try {
+      const { data, error } = await supabase.functions.invoke<{ body: unknown | null }>(
+        'lessons-read',
+        { body: { lesson_id: lessonId } },
+      );
+      if (!error && data?.body != null) return data.body;
+    } catch {
+      // Treat transient errors as "not ready yet" and keep polling.
+    }
+    delay = Math.min(Math.round(delay * 1.4), 5000);
+  }
+  return null;
 }
 
 // Read-only body fetch. Used by the Article screen on every open since the

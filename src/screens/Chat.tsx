@@ -146,7 +146,7 @@ export function ChatScreen({ embeddedLessonId }: Props = {}) {
 
       <div
         ref={scrollerRef}
-        className="absolute top-[70px] bottom-[88px] left-0 right-0 overflow-y-auto px-3.5 pt-4 pb-2"
+        className="absolute top-[70px] bottom-[calc(env(safe-area-inset-bottom)+88px)] left-0 right-0 overflow-y-auto px-3.5 pt-4 pb-2"
         style={{
           backgroundImage: `radial-gradient(circle, #F0E2CD 1px, transparent 1.4px)`,
           backgroundSize: '16px 16px',
@@ -181,7 +181,7 @@ export function ChatScreen({ embeddedLessonId }: Props = {}) {
         </div>
       </div>
 
-      <div className="absolute bottom-4 left-0 right-0 px-3.5 pb-2.5">
+      <div className="absolute bottom-[calc(env(safe-area-inset-bottom)+1rem)] left-0 right-0 px-3.5 pb-2.5">
         {isFree && (
           <div className="mb-2 px-3.5 py-2 rounded-2xl bg-[#FEF3C7] border-[1.5px] border-[#FCD34D] text-[11px] font-extrabold text-[#92400E] font-jp leading-[1.5] text-center">
             AIアシスタントは有料プランで使えます

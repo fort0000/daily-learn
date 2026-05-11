@@ -143,7 +143,7 @@ export function CreateScreen() {
         )}
       </div>
 
-      <div className="absolute bottom-6 left-4 right-4 z-20">
+      <div className="absolute bottom-[calc(env(safe-area-inset-bottom)+1.5rem)] left-4 right-4 z-20">
         <div
           className={`${canSubmit ? 'opacity-100 pointer-events-auto' : 'opacity-45 pointer-events-none'}`}
         >

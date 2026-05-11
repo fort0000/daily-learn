@@ -232,8 +232,10 @@ function Header({
     const el = document.querySelector(hash) as HTMLElement | null;
     if (!el) return;
     e.preventDefault();
-    const headerH = 72;
-    const top = el.getBoundingClientRect().top + window.scrollY - headerH;
+    // Sticky header is ~72px tall; leave extra breathing room so the section
+    // eyebrow doesn't sit flush against the header on landing.
+    const headerOffset = 96;
+    const top = el.getBoundingClientRect().top + window.scrollY - headerOffset;
     window.scrollTo({ top, behavior: 'smooth' });
     window.history.replaceState(null, '', hash);
   };

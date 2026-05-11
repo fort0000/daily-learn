@@ -64,7 +64,7 @@
 .dl-lp #features,
 .dl-lp #pricing,
 .dl-lp #faq,
-.dl-lp #cta{ scroll-margin-top: 80px; }
+.dl-lp #cta{ scroll-margin-top: 96px; }
 
 .dl-lp a{ color: inherit; text-decoration: none; }
 .dl-lp button{ font-family: inherit; cursor: pointer; border: none; background: none; }

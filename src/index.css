@@ -11,6 +11,18 @@ body {
   height: 100%;
   -webkit-font-smoothing: antialiased;
 }
+
+/* Prevent iOS Safari from auto-zooming when focusing a text field.
+   The trigger is font-size < 16px on the input itself, so on touch
+   devices we override every text input to at least 16px. Desktop is
+   untouched so the existing Tailwind sizes (text-sm etc.) still apply. */
+@media (hover: none) and (pointer: coarse) {
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
+}
 body {
   font-family: 'Nunito', 'Hiragino Sans', 'Noto Sans JP', system-ui, sans-serif;
   color: #0f172a;

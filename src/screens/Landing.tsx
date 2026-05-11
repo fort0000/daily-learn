@@ -5,6 +5,48 @@ import './Landing.css';
 
 const ROUTE_FADE_MS = 240;
 
+// Testing-only switch: while we're validating the LP itself, every CTA /
+// ログイン link is intercepted so we never leave the marketing page. Flip
+// back to false (or delete the guards) when going live.
+const LP_NAV_DISABLED = true;
+
+// Wrapper used by every CTA / login link in the LP. In testing mode it
+// renders a plain anchor with href="#" so even Cmd/Ctrl/middle-click can't
+// escape to the app routes. In production it falls back to react-router's
+// <Link> with the original `to`.
+function CtaLink({
+  to,
+  className,
+  onClick,
+  children,
+}: {
+  to: string;
+  className?: string;
+  onClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void;
+  children: ReactNode;
+}) {
+  if (LP_NAV_DISABLED) {
+    return (
+      <a
+        href="#"
+        className={className}
+        onClick={(e) => {
+          e.preventDefault();
+          console.info('[Landing] navigation suppressed (testing):', to);
+          onClick?.(e);
+        }}
+      >
+        {children}
+      </a>
+    );
+  }
+  return (
+    <Link to={to} className={className} onClick={onClick}>
+      {children}
+    </Link>
+  );
+}
+
 const FLAME_SRC = '/flame.png';
 
 const FAQS: { q: string; a: string }[] = [
@@ -55,6 +97,10 @@ export function LandingScreen() {
   // that takes the user to a different route (header CTA, ログイン, in-page
   // CTAs) so route swaps don't feel like an instant flash.
   const fadeNavigate = (to: string) => {
+    if (LP_NAV_DISABLED) {
+      console.info('[Landing] navigation suppressed (testing):', to);
+      return;
+    }
     if (leaving) return;
     setLeaving(true);
     window.setTimeout(() => navigate(to), ROUTE_FADE_MS);
@@ -264,17 +310,17 @@ function Header({
           <a className="text-link" href="#pricing" onClick={(e) => handleAnchor(e, '#pricing')}>料金</a>
           <a className="text-link" href="#faq" onClick={(e) => handleAnchor(e, '#faq')}>FAQ</a>
           {!isSignedIn && (
-            <Link className="text-link" to="/login" onClick={(e) => handleRoute(e, '/login')}>
+            <CtaLink className="text-link" to="/login" onClick={(e) => handleRoute(e, '/login')}>
               ログイン
-            </Link>
+            </CtaLink>
           )}
-          <Link
+          <CtaLink
             className="btn btn-primary btn-sm"
             to={startHref}
             onClick={(e) => handleRoute(e, startHref)}
           >
             <span className="jp">{isSignedIn ? 'アプリを開く' : '無料で始める'}</span>
-          </Link>
+          </CtaLink>
         </nav>
       </div>
     </header>
@@ -319,7 +365,7 @@ function Hero({
             </p>
 
             <div className="cta-row">
-              <Link
+              <CtaLink
                 className="btn btn-primary btn-lg"
                 to={startHref}
                 onClick={(e) => {
@@ -329,7 +375,7 @@ function Hero({
               >
                 <span className="jp">{isSignedIn ? 'アプリを開く' : '学習を始める'}</span>
                 <span aria-hidden="true">→</span>
-              </Link>
+              </CtaLink>
             </div>
 
             <div className="badges">
@@ -1286,14 +1332,14 @@ function Pricing({
             </ul>
 
             <div className="card-cta-wrap">
-              <Link
+              <CtaLink
                 className="btn-free-cta"
                 to={startHref}
                 onClick={(e) => onCta(e, startHref)}
               >
                 <span className="jp">まずは無料で始める</span>
                 <span aria-hidden="true">→</span>
-              </Link>
+              </CtaLink>
               <div className="free-fine">いつでもプレミアムにアップグレード可能</div>
             </div>
           </div>
@@ -1339,14 +1385,14 @@ function Pricing({
             </ul>
 
             <div className="card-cta-wrap">
-              <Link
+              <CtaLink
                 className="btn-prem-cta"
                 to={startHref}
                 onClick={(e) => onCta(e, startHref)}
               >
                 <span className="jp">プレミアムを始める</span>
                 <span aria-hidden="true">→</span>
-              </Link>
+              </CtaLink>
               <div className="prem-fine">いつでもキャンセル可能 · 自動更新</div>
             </div>
           </div>
@@ -1502,7 +1548,7 @@ function FinalCta({
               <path d="M4 12 Q12 2 22 12 T42 12 T58 12" />
             </svg>
 
-            <Link
+            <CtaLink
               className="btn btn-primary btn-xl"
               to={startHref}
               onClick={(e) => {
@@ -1512,7 +1558,7 @@ function FinalCta({
             >
               <span className="jp">アプリを開く</span>
               <span aria-hidden="true">→</span>
-            </Link>
+            </CtaLink>
           </div>
 
           <div style={{ marginTop: 24, fontSize: 13, color: 'var(--slate-2)', fontWeight: 700 }}>

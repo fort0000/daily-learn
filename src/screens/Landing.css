@@ -266,12 +266,12 @@
   z-index: 1;
 }
 .dl-lp .hero h1{
-  font-size: clamp(40px, 5.6vw, 68px);
+  font-size: clamp(28px, 4.8vw, 56px);
   line-height: 1.12;
   letter-spacing: -0.6px;
   margin-top: 18px;
 }
-.dl-lp .hero h1 .row{ display: block; }
+.dl-lp .hero h1 .row{ display: block; text-wrap: balance; }
 .dl-lp .hero h1 .num{
   color: var(--primary);
   font-family: var(--font-en);
@@ -2436,7 +2436,7 @@
 
 @media (max-width: 540px){
   .dl-lp .container{ padding: 0 18px; }
-  .dl-lp .hero h1{ font-size: 38px; }
+  .dl-lp .hero h1{ font-size: clamp(28px, 8.4vw, 38px); }
   .dl-lp .section-h h2{ font-size: 28px; }
   .dl-lp .feature .copy h2{ font-size: 26px; }
   .dl-lp .final-cta h2{ font-size: 32px; }

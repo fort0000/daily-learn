@@ -89,7 +89,7 @@ function AppLayout() {
 
 function Shell({ children }: { children: ReactNode }) {
   return (
-    <div className="flex w-full h-screen overflow-hidden bg-dl-bg md:max-w-[880px] md:mx-auto md:shadow-[0_0_60px_rgba(15,23,42,0.06)]">
+    <div className="flex w-full h-screen bg-dl-bg md:max-w-[880px] md:mx-auto md:shadow-[0_0_60px_rgba(15,23,42,0.06)]">
       {children}
     </div>
   );

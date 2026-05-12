@@ -182,7 +182,7 @@ export function HomeScreen() {
   return (
     <Phone>
       <StatusBar />
-      <div className="pt-0.5 px-5 pr-[76px]">
+      <div className="pt-1 px-5 pr-[76px]">
         <div className="text-[13px] text-dl-slate font-bold tracking-[0.5px]">{headerDate}</div>
         <div className="flex gap-2 items-center mt-2.5 flex-wrap">
           <div className="bg-white rounded-full pl-1.5 pr-2.5 py-1 flex items-center gap-1 shadow-[0_0_0_2px_#F97316]">
@@ -201,8 +201,8 @@ export function HomeScreen() {
         <LessonCarousel cards={cards} onChanged={load} focusCourseId={focusCourseId} />
       )}
 
-      <div className="pt-4 px-5">
-        <div className="flex justify-between items-baseline mb-2">
+      <div className="pt-[18px] px-5">
+        <div className="flex justify-between items-baseline mb-2.5">
           <div className="text-sm font-extrabold text-dl-navy font-jp">今週の学習</div>
           <div className="text-[11px] font-extrabold text-dl-mint-dark font-jp">{doneCount} / 7 日</div>
         </div>
@@ -260,12 +260,12 @@ export function HomeScreen() {
 function NewCourseCTA({ targetPath }: { targetPath: string }) {
   const navigate = useNavigate();
   return (
-    <div className="pt-3 px-5">
+    <div className="pt-3.5 px-5">
       <button
         onClick={() => navigate(targetPath)}
-        className="w-full bg-white border-2 border-dashed border-dl-primary rounded-[20px] px-4 py-2.5 flex items-center gap-3 cursor-pointer font-jp text-left"
+        className="w-full bg-white border-2 border-dashed border-dl-primary rounded-[20px] px-4 py-3.5 flex items-center gap-3 cursor-pointer font-jp text-left"
       >
-        <div className="w-10 h-10 rounded-[12px] bg-dl-primary flex items-center justify-center shadow-[0_3px_0_#C8431A] shrink-0">
+        <div className="w-11 h-11 rounded-[14px] bg-dl-primary flex items-center justify-center shadow-[0_3px_0_#C8431A] shrink-0">
           <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
             <path d="M11 4 V18 M4 11 H18" stroke="#fff" strokeWidth="3" strokeLinecap="round" />
           </svg>
@@ -375,7 +375,7 @@ function LessonCarousel({
   const wasDragging = () => moved.current;
 
   return (
-    <div className="pt-3">
+    <div className="pt-5">
       <div
         ref={viewportRef}
         onMouseDown={onStart}
@@ -409,7 +409,7 @@ function LessonCarousel({
         </div>
       </div>
       {cards.length > 1 && (
-        <div className="flex justify-center gap-1.5 mt-2">
+        <div className="flex justify-center gap-1.5 mt-3">
           {cards.map((c, i) => (
             <div
               key={c.course.id}
@@ -452,7 +452,7 @@ function CardShell({
   children: React.ReactNode;
 }) {
   return (
-    <div className="bg-white rounded-3xl pt-3.5 px-5 pb-4 border-[1.5px] border-dl-border shadow-[0_4px_0_#F0E2CD] relative overflow-hidden">
+    <div className="bg-white rounded-3xl pt-[18px] px-5 pb-[22px] border-[1.5px] border-dl-border shadow-[0_4px_0_#F0E2CD] relative overflow-hidden">
       <div
         className="absolute -top-10 -right-[30px] w-[120px] h-[120px] rounded-full opacity-70"
         style={{
@@ -493,15 +493,15 @@ function ActiveCard({
         </div>
         <div className="text-[11px] font-extrabold text-dl-slate font-jp">⏱ 約10分</div>
       </div>
-      <div className="mt-2.5 text-[11px] font-extrabold text-dl-slate-light tracking-wider font-jp">
+      <div className="mt-3.5 text-[11px] font-extrabold text-dl-slate-light tracking-wider font-jp">
         {course.title}
       </div>
-      <div className="mt-1 text-[21px] font-black text-dl-navy font-jp leading-[1.2] tracking-[-0.3px]">
+      <div className="mt-1 text-[23px] font-black text-dl-navy font-jp leading-[1.25] tracking-[-0.3px]">
         {lesson.title}
       </div>
-      <div className="mt-1.5 text-[13px] text-dl-slate leading-[1.55] font-jp line-clamp-2">{lesson.summary}</div>
+      <div className="mt-2 text-[13px] text-dl-slate leading-[1.6] font-jp">{lesson.summary}</div>
       {locked ? (
-        <div className="mt-3 bg-[#FEF3C7] border-[1.5px] border-[#FCD34D] rounded-2xl px-3.5 py-3 flex items-center gap-2.5">
+        <div className="mt-[18px] bg-[#FEF3C7] border-[1.5px] border-[#FCD34D] rounded-2xl px-3.5 py-3 flex items-center gap-2.5">
           <div className="text-2xl shrink-0">🔒</div>
           <div className="min-w-0">
             <div className="text-[12px] font-black text-[#92400E] font-jp">
@@ -513,7 +513,7 @@ function ActiveCard({
           </div>
         </div>
       ) : (
-        <div className="mt-3">
+        <div className="mt-[18px]">
           <PushButton
             color={palette.color}
             shadow={palette.shadow}
@@ -530,7 +530,7 @@ function ActiveCard({
         onClick={() => {
           if (!wasDragging()) navigate(`/roadmap?courseId=${course.id}`);
         }}
-        className="mt-2.5 flex items-center justify-between pt-2.5 border-t border-dashed border-dl-border cursor-pointer"
+        className="mt-3.5 flex items-center justify-between pt-3 border-t border-dashed border-dl-border cursor-pointer"
       >
         <div className="flex items-center gap-2">
           <div

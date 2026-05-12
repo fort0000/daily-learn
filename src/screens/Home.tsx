@@ -12,6 +12,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { DL } from '../lib/dl';
 import { useProfile, useSession } from '../lib/auth';
 import { Phone } from '../components/Phone';
+import { StatusBar } from '../components/StatusBar';
 import { TabBar } from '../components/TabBar';
 import { Flame } from '../components/Flame';
 import { PushButton } from '../components/PushButton';
@@ -180,18 +181,12 @@ export function HomeScreen() {
 
   return (
     <Phone>
-      {/* Internal scroll container so iOS handles touch / momentum / bounce
-        natively (matches Profile / Article / Roadmap), and so the bottom
-        CTA stays reachable even when the visible viewport is too short
-        for the whole stack. Top / bottom padding respects safe-area so
-        nothing hides under the iOS status bar or home indicator. */}
-      <div
-        className="absolute inset-0 overflow-y-auto overscroll-contain"
-        style={{
-          paddingTop: 'max(1rem, env(safe-area-inset-top))',
-          paddingBottom: 'max(1rem, env(safe-area-inset-bottom))',
-        }}
-      >
+      <StatusBar />
+      {/* Match Profile's scroll pattern: an absolute pane below the StatusBar
+        that scrolls with native iOS momentum / bounce. pb-6 keeps a comfy
+        gap above the home indicator. Other screens (Chat, etc.) intentionally
+        do NOT scroll — Shell pins html/body overflow:hidden for them. */}
+      <div className="absolute top-4 bottom-0 left-0 right-0 overflow-y-auto overscroll-contain pb-6">
         <div className="pt-1 px-5 pr-[76px]">
           <div className="text-[13px] text-dl-slate font-bold tracking-[0.5px]">{headerDate}</div>
           <div className="flex gap-2 items-center mt-2.5 flex-wrap">

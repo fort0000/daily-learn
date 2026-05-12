@@ -55,6 +55,7 @@ Deno.serve(async (req: Request) => {
   }
   const completedLessonId = payload.lesson_id;
   if (!completedLessonId) return jsonError(400, "invalid_input", "lesson_id is required");
+  console.log(`[lessons-prefetch-next] start completed_lesson=${completedLessonId}`);
 
   const authHeader = req.headers.get("Authorization");
   if (!authHeader) return jsonError(401, "unauthorized", "Missing Authorization header");
@@ -78,6 +79,9 @@ Deno.serve(async (req: Request) => {
   const courseId = (completed as LessonRow).course_id;
   const completedDay = (completed as LessonRow).day;
   if (completedDay >= 30) {
+    console.log(
+      `[lessons-prefetch-next] skip course_done lesson=${completedLessonId} day=${completedDay}`,
+    );
     return new Response(JSON.stringify({ skipped: "course_done" }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -96,6 +100,9 @@ Deno.serve(async (req: Request) => {
     .maybeSingle();
   const plan = (profile as { plan: "free" | "paid" } | null)?.plan ?? "free";
   if (plan === "free" && completedDay + 1 > 10) {
+    console.log(
+      `[lessons-prefetch-next] skip plan_limit user=${user.id} plan=${plan} next_day=${completedDay + 1}`,
+    );
     return new Response(JSON.stringify({ skipped: "plan_limit" }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -116,6 +123,9 @@ Deno.serve(async (req: Request) => {
   if (maxDayErr) return jsonError(500, "db_error", maxDayErr.message);
   const maxCompletedDay = (maxDayRow as { day: number } | null)?.day ?? 0;
   if (maxCompletedDay !== completedDay) {
+    console.log(
+      `[lessons-prefetch-next] skip not_frontier course=${courseId} completed_day=${completedDay} max_completed_day=${maxCompletedDay}`,
+    );
     return new Response(JSON.stringify({ skipped: "not_frontier" }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -152,12 +162,18 @@ Deno.serve(async (req: Request) => {
 
   // Idempotence: only enqueue when both body and prefetch_batch_id are clean.
   if (next.body !== null) {
+    console.log(
+      `[lessons-prefetch-next] skip already_generated next_lesson=${next.id} day=${next.day}`,
+    );
     return new Response(JSON.stringify({ skipped: "already_generated" }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
   if (next.prefetch_batch_id !== null) {
+    console.log(
+      `[lessons-prefetch-next] skip already_enqueued next_lesson=${next.id} day=${next.day} batch=${next.prefetch_batch_id}`,
+    );
     return new Response(JSON.stringify({ skipped: "already_enqueued" }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -212,7 +228,7 @@ Deno.serve(async (req: Request) => {
   // the row already has a batch_id and the second batch is silently leaked
   // (Anthropic eventually expires it). Acceptable — we already pay for the
   // first one.
-  const { error: updErr } = await adminForPlan
+  const { data: updRows, error: updErr } = await adminForPlan
     .from("lessons")
     .update({
       prefetch_batch_id: batchJson.id,
@@ -220,8 +236,21 @@ Deno.serve(async (req: Request) => {
     })
     .eq("id", next.id)
     .is("body", null)
-    .is("prefetch_batch_id", null);
+    .is("prefetch_batch_id", null)
+    .select("id");
   if (updErr) return jsonError(500, "db_error", updErr.message);
+  if (!updRows || updRows.length === 0) {
+    // Lost the race: another concurrent invocation already set prefetch_batch_id
+    // (or body) on this row between our read and write. The batch we just
+    // submitted to Anthropic is silently leaked (we already pay for it).
+    console.warn(
+      `[lessons-prefetch-next] update missed lesson=${next.id} day=${next.day} leaked_batch=${batchJson.id}`,
+    );
+  } else {
+    console.log(
+      `[lessons-prefetch-next] enqueued lesson=${next.id} day=${next.day} batch=${batchJson.id}`,
+    );
+  }
 
   return new Response(
     JSON.stringify({ enqueued: true, lesson_id: next.id, batch_id: batchJson.id }),

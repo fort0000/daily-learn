@@ -221,7 +221,7 @@ export function ArticleScreen() {
         </div>
       </div>
 
-      <div className="absolute top-[70px] bottom-0 left-0 right-0 overflow-y-auto px-[18px] pb-8">
+      <div className="absolute top-[70px] bottom-0 left-0 right-0 overflow-y-auto overscroll-contain px-[18px] pb-8">
         {loading ? (
           <Skeleton />
         ) : !lesson ? (
@@ -273,7 +273,7 @@ export function ArticleScreen() {
           else openChat();
         }}
         title={chatVisible ? 'レッスンに戻る' : 'AIアシスタントに質問'}
-        className={`absolute bottom-[calc(env(safe-area-inset-bottom)+1.5rem)] right-[18px] z-[60] w-[58px] h-[58px] rounded-full flex items-center justify-center ${
+        className={`absolute bottom-[calc(env(safe-area-inset-bottom)+2.5rem)] right-[18px] z-[60] w-[58px] h-[58px] rounded-full flex items-center justify-center ${
           lesson ? 'cursor-pointer' : 'opacity-50 cursor-not-allowed pointer-events-none'
         }`}
         style={{
@@ -340,11 +340,11 @@ export function ArticleScreen() {
           className="absolute inset-0 z-[55]"
           style={{
             clipPath: chatVisible
-              ? 'circle(140% at calc(100% - 47px) calc(100% - env(safe-area-inset-bottom) - 53px))'
-              : 'circle(0px at calc(100% - 47px) calc(100% - env(safe-area-inset-bottom) - 53px))',
+              ? 'circle(140% at calc(100% - 47px) calc(100% - env(safe-area-inset-bottom) - 69px))'
+              : 'circle(0px at calc(100% - 47px) calc(100% - env(safe-area-inset-bottom) - 69px))',
             WebkitClipPath: chatVisible
-              ? 'circle(140% at calc(100% - 47px) calc(100% - env(safe-area-inset-bottom) - 53px))'
-              : 'circle(0px at calc(100% - 47px) calc(100% - env(safe-area-inset-bottom) - 53px))',
+              ? 'circle(140% at calc(100% - 47px) calc(100% - env(safe-area-inset-bottom) - 69px))'
+              : 'circle(0px at calc(100% - 47px) calc(100% - env(safe-area-inset-bottom) - 69px))',
             transition:
               'clip-path 460ms cubic-bezier(.4,0,.2,1), -webkit-clip-path 460ms cubic-bezier(.4,0,.2,1)',
             pointerEvents: chatVisible ? 'auto' : 'none',

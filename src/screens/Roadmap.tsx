@@ -147,7 +147,7 @@ export function RoadmapScreen() {
       </div>
 
       <div
-        className="absolute top-[200px] bottom-0 left-0 right-0 overflow-y-auto"
+        className="absolute top-[200px] bottom-0 left-0 right-0 overflow-y-auto overscroll-contain"
         style={{
           backgroundImage: `radial-gradient(circle, #E8DCC4 1.2px, transparent 1.5px)`,
           backgroundSize: '20px 20px',

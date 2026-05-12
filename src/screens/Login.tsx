@@ -84,7 +84,7 @@ export function LoginScreen() {
   return (
     <Phone>
       <StatusBar />
-      <div className="absolute top-4 bottom-0 left-0 right-0 overflow-y-auto px-5 pb-8">
+      <div className="absolute top-4 bottom-0 left-0 right-0 overflow-y-auto overscroll-contain px-5 pb-8">
         <div className="pt-2 flex flex-col items-center gap-2">
           <AppIcon size={72} />
 

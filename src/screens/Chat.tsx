@@ -146,7 +146,7 @@ export function ChatScreen({ embeddedLessonId }: Props = {}) {
 
       <div
         ref={scrollerRef}
-        className="absolute top-[70px] bottom-[calc(env(safe-area-inset-bottom)+88px)] left-0 right-0 overflow-y-auto px-3.5 pt-4 pb-2"
+        className="absolute top-[70px] bottom-[calc(env(safe-area-inset-bottom)+88px)] left-0 right-0 overflow-y-auto overscroll-contain px-3.5 pt-4 pb-2"
         style={{
           backgroundImage: `radial-gradient(circle, #F0E2CD 1px, transparent 1.4px)`,
           backgroundSize: '16px 16px',

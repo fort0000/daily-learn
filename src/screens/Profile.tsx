@@ -114,7 +114,7 @@ export function ProfileScreen() {
   return (
     <Phone>
       <StatusBar />
-      <div className="absolute top-4 bottom-0 left-0 right-0 overflow-y-auto pb-6">
+      <div className="absolute top-4 bottom-0 left-0 right-0 overflow-y-auto overscroll-contain pb-6">
         <div className="pt-1 px-5 pr-[76px]">
           <div className="text-[17px] font-black text-dl-navy font-jp">{displayName}</div>
         </div>

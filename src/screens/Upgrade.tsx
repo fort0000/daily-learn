@@ -95,7 +95,7 @@ export function UpgradeScreen() {
 
   return (
     <Phone>
-      <div className="absolute inset-0 overflow-y-auto pb-10">
+      <div className="absolute inset-0 overflow-y-auto overscroll-contain pb-10">
         <div className="h-4" />
 
         {/* Top bar */}

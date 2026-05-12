@@ -91,7 +91,7 @@ export function CreateScreen() {
         </div>
       </div>
 
-      <div className="absolute top-[70px] bottom-0 left-0 right-0 overflow-y-auto pt-1 px-5 pb-[120px]">
+      <div className="absolute top-[70px] bottom-0 left-0 right-0 overflow-y-auto overscroll-contain pt-1 px-5 pb-[120px]">
         <div className="mb-[18px]">
           <h1 className="text-[22px] font-black text-dl-navy font-jp leading-[1.3] mt-0 mx-0 mb-1.5 tracking-[-0.3px]">
             何を学びたい？

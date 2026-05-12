@@ -14,13 +14,15 @@ body {
 
 /* Prevent iOS Safari from auto-zooming when focusing a text field.
    The trigger is font-size < 16px on the input itself, so on touch
-   devices we override every text input to at least 16px. Desktop is
-   untouched so the existing Tailwind sizes (text-sm etc.) still apply. */
+   devices we override every text input to at least 16px. !important
+   beats Tailwind arbitrary-value classes like text-[13px] which would
+   otherwise win on specificity (class > element). Desktop is untouched
+   so the existing Tailwind sizes (text-sm etc.) still apply. */
 @media (hover: none) and (pointer: coarse) {
   input,
   textarea,
   select {
-    font-size: 16px;
+    font-size: 16px !important;
   }
 }
 body {

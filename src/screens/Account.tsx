@@ -116,7 +116,7 @@ export function AccountScreen() {
         </div>
       </div>
 
-      <div className="absolute top-[70px] bottom-0 left-0 right-0 overflow-y-auto pt-1 px-5 pb-[120px]">
+      <div className="absolute top-[70px] bottom-0 left-0 right-0 overflow-y-auto overscroll-contain pt-1 px-5 pb-[120px]">
         <PlanRow plan={profile?.plan ?? null} />
 
         <AccountField label="名前">

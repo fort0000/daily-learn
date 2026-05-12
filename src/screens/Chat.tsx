@@ -60,7 +60,14 @@ export function ChatScreen({ embeddedLessonId }: Props = {}) {
       });
 
     const unsub = subscribeToChatMessages(lessonId, (msg) => {
-      setMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]));
+      setMessages((prev) => {
+        if (prev.some((m) => m.id === msg.id)) return prev;
+        // Drop any matching optimistic placeholder so the real row replaces it.
+        const filtered = prev.filter(
+          (m) => !(m.id.startsWith('__opt-') && m.role === msg.role && m.content === msg.content),
+        );
+        return [...filtered, msg];
+      });
     });
     return () => {
       active = false;
@@ -79,15 +86,27 @@ export function ChatScreen({ embeddedLessonId }: Props = {}) {
     if (!lessonId || sending) return;
     const content = (text ?? draft).trim();
     if (!content) return;
+
+    const optimisticId = `__opt-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const optimistic: ChatMessage = {
+      id: optimisticId,
+      lesson_id: lessonId,
+      role: 'user',
+      content,
+      created_at: new Date().toISOString(),
+    };
+    setMessages((prev) => [...prev, optimistic]);
     setSending(true);
     setError(null);
     setDraft('');
     try {
       const { user, assistant } = await sendChatMessage(lessonId, content);
-      // Realtime usually beats us here, but de-dupe defensively.
+      // Realtime may have already replaced the optimistic row; drop any
+      // remaining placeholder and de-dupe against ids already in state.
       setMessages((prev) => {
-        const existing = new Set(prev.map((m) => m.id));
-        const next = [...prev];
+        const withoutOptimistic = prev.filter((m) => m.id !== optimisticId);
+        const existing = new Set(withoutOptimistic.map((m) => m.id));
+        const next = [...withoutOptimistic];
         if (!existing.has(user.id)) next.push(user);
         if (!existing.has(assistant.id)) next.push(assistant);
         return next.sort((a, b) => a.created_at.localeCompare(b.created_at));
@@ -96,6 +115,7 @@ export function ChatScreen({ embeddedLessonId }: Props = {}) {
       console.error('[Chat] sendChatMessage failed:', e);
       setError(e instanceof Error ? e.message : '送信に失敗しました');
       setDraft(content); // restore so the user can retry
+      setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
     } finally {
       setSending(false);
     }

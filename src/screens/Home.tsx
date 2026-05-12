@@ -12,7 +12,6 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { DL } from '../lib/dl';
 import { useProfile, useSession } from '../lib/auth';
 import { Phone } from '../components/Phone';
-import { StatusBar } from '../components/StatusBar';
 import { TabBar } from '../components/TabBar';
 import { Flame } from '../components/Flame';
 import { PushButton } from '../components/PushButton';
@@ -181,77 +180,89 @@ export function HomeScreen() {
 
   return (
     <Phone>
-      <StatusBar />
-      <div className="pt-1 px-5 pr-[76px]">
-        <div className="text-[13px] text-dl-slate font-bold tracking-[0.5px]">{headerDate}</div>
-        <div className="flex gap-2 items-center mt-2.5 flex-wrap">
-          <div className="bg-white rounded-full pl-1.5 pr-2.5 py-1 flex items-center gap-1 shadow-[0_0_0_2px_#F97316]">
-            <Flame size={22} />
-            <div className="text-[13px] font-black text-dl-fire tabular-nums">{streak.current}</div>
-            <div className="text-[10px] font-extrabold text-dl-slate font-jp">日連続</div>
+      {/* Internal scroll container so iOS handles touch / momentum / bounce
+        natively (matches Profile / Article / Roadmap), and so the bottom
+        CTA stays reachable even when the visible viewport is too short
+        for the whole stack. Top / bottom padding respects safe-area so
+        nothing hides under the iOS status bar or home indicator. */}
+      <div
+        className="absolute inset-0 overflow-y-auto overscroll-contain"
+        style={{
+          paddingTop: 'max(1rem, env(safe-area-inset-top))',
+          paddingBottom: 'max(1rem, env(safe-area-inset-bottom))',
+        }}
+      >
+        <div className="pt-1 px-5 pr-[76px]">
+          <div className="text-[13px] text-dl-slate font-bold tracking-[0.5px]">{headerDate}</div>
+          <div className="flex gap-2 items-center mt-2.5 flex-wrap">
+            <div className="bg-white rounded-full pl-1.5 pr-2.5 py-1 flex items-center gap-1 shadow-[0_0_0_2px_#F97316]">
+              <Flame size={22} />
+              <div className="text-[13px] font-black text-dl-fire tabular-nums">{streak.current}</div>
+              <div className="text-[10px] font-extrabold text-dl-slate font-jp">日連続</div>
+            </div>
           </div>
         </div>
-      </div>
 
-      {cards === null ? (
-        <CarouselSkeleton />
-      ) : cards.length === 0 ? (
-        <EmptyCarousel />
-      ) : (
-        <LessonCarousel cards={cards} onChanged={load} focusCourseId={focusCourseId} />
-      )}
+        {cards === null ? (
+          <CarouselSkeleton />
+        ) : cards.length === 0 ? (
+          <EmptyCarousel />
+        ) : (
+          <LessonCarousel cards={cards} onChanged={load} focusCourseId={focusCourseId} />
+        )}
 
-      <div className="pt-[18px] px-5">
-        <div className="flex justify-between items-baseline mb-2.5">
-          <div className="text-sm font-extrabold text-dl-navy font-jp">今週の学習</div>
-          <div className="text-[11px] font-extrabold text-dl-mint-dark font-jp">{doneCount} / 7 日</div>
-        </div>
-        <div className="flex gap-1.5 justify-between">
-          {week.map((d) => (
-            <div key={d.date} className="flex-1 flex flex-col items-center gap-1">
-              <div
-                className={`w-9 h-9 rounded-full flex items-center justify-center font-black text-[13px] ${
-                  d.done
-                    ? 'bg-dl-mint text-white shadow-[0_2px_0_#0F7A38]'
-                    : d.today
-                    ? 'bg-white text-dl-slate-light border-[2.5px] border-dashed border-dl-primary'
-                    : 'bg-[#F5EDDF] text-dl-slate-light'
-                }`}
-              >
-                {d.done ? (
-                  <svg width="16" height="16" viewBox="0 0 16 16">
-                    <path
-                      d="M3 8 L7 12 L13 4"
-                      stroke="#fff"
-                      strokeWidth="2.6"
-                      fill="none"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                ) : d.today ? (
-                  '今'
-                ) : (
-                  ''
-                )}
+        <div className="pt-[18px] px-5">
+          <div className="flex justify-between items-baseline mb-2.5">
+            <div className="text-sm font-extrabold text-dl-navy font-jp">今週の学習</div>
+            <div className="text-[11px] font-extrabold text-dl-mint-dark font-jp">{doneCount} / 7 日</div>
+          </div>
+          <div className="flex gap-1.5 justify-between">
+            {week.map((d) => (
+              <div key={d.date} className="flex-1 flex flex-col items-center gap-1">
+                <div
+                  className={`w-9 h-9 rounded-full flex items-center justify-center font-black text-[13px] ${
+                    d.done
+                      ? 'bg-dl-mint text-white shadow-[0_2px_0_#0F7A38]'
+                      : d.today
+                      ? 'bg-white text-dl-slate-light border-[2.5px] border-dashed border-dl-primary'
+                      : 'bg-[#F5EDDF] text-dl-slate-light'
+                  }`}
+                >
+                  {d.done ? (
+                    <svg width="16" height="16" viewBox="0 0 16 16">
+                      <path
+                        d="M3 8 L7 12 L13 4"
+                        stroke="#fff"
+                        strokeWidth="2.6"
+                        fill="none"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  ) : d.today ? (
+                    '今'
+                  ) : (
+                    ''
+                  )}
+                </div>
+                <div
+                  className={`text-[10px] font-bold font-jp ${
+                    d.today ? 'text-dl-primary' : 'text-dl-slate-light'
+                  }`}
+                >
+                  {d.label}
+                </div>
               </div>
-              <div
-                className={`text-[10px] font-bold font-jp ${
-                  d.today ? 'text-dl-primary' : 'text-dl-slate-light'
-                }`}
-              >
-                {d.label}
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
-      </div>
 
-      <NewCourseCTA
-        targetPath={
-          profile?.plan === 'free' && (cards?.length ?? 0) >= 1 ? '/upgrade' : '/create'
-        }
-      />
+        <NewCourseCTA
+          targetPath={
+            profile?.plan === 'free' && (cards?.length ?? 0) >= 1 ? '/upgrade' : '/create'
+          }
+        />
+      </div>
       <TabBar active="home" />
     </Phone>
   );

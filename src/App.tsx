@@ -78,7 +78,7 @@ function AppLayout() {
   return (
     <>
       <Sidebar />
-      <div ref={stageRef} className="flex-1 w-full h-screen bg-dl-bg relative overflow-hidden">
+      <div ref={stageRef} className="flex-1 w-full h-dvh bg-dl-bg relative overflow-hidden">
         <div key={location.pathname} className="w-full h-full animate-dlfade">
           <Outlet />
         </div>
@@ -88,12 +88,14 @@ function AppLayout() {
 }
 
 function Shell({ children }: { children: ReactNode }) {
-  // On iOS Safari, h-screen (100vh) is the *large* viewport — it includes the
-  // URL bar even while the bar is visible. That makes the body taller than
-  // the visible area, so the document scrolls even though every inner layer
-  // is `overflow-hidden`. Pin html/body to `overflow:hidden` for the lifetime
-  // of the shell so the page itself can never scroll. Landing renders outside
-  // Shell, so its own document-level scroll is unaffected.
+  // On iOS Safari, the bottom URL bar floats over content and `100vh` (lvh)
+  // ignores it, so an h-screen Phone extends below the visible viewport and
+  // the document can scroll past the bar. Use `h-dvh` on every shell layer
+  // (here, the stage, and FullStage) so they track the *currently visible*
+  // viewport instead — Phone shrinks when the bar is up so the CTA stays
+  // above it. Additionally pin html/body to `overflow:hidden` for the
+  // lifetime of the shell to defeat any residual document-level scroll.
+  // Landing renders outside Shell, so its own document scroll is unaffected.
   useEffect(() => {
     const html = document.documentElement;
     const body = document.body;
@@ -107,7 +109,7 @@ function Shell({ children }: { children: ReactNode }) {
     };
   }, []);
   return (
-    <div className="flex w-full h-screen overflow-hidden bg-dl-bg md:max-w-[880px] md:mx-auto md:shadow-[0_0_60px_rgba(15,23,42,0.06)]">
+    <div className="flex w-full h-dvh overflow-hidden bg-dl-bg md:max-w-[880px] md:mx-auto md:shadow-[0_0_60px_rgba(15,23,42,0.06)]">
       {children}
     </div>
   );
@@ -115,7 +117,7 @@ function Shell({ children }: { children: ReactNode }) {
 
 function FullStage({ children }: { children: ReactNode }) {
   return (
-    <div className="flex-1 w-full h-screen bg-dl-bg relative overflow-hidden">
+    <div className="flex-1 w-full h-dvh bg-dl-bg relative overflow-hidden">
       {children}
     </div>
   );

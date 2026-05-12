@@ -88,6 +88,24 @@ function AppLayout() {
 }
 
 function Shell({ children }: { children: ReactNode }) {
+  // On iOS Safari, h-screen (100vh) is the *large* viewport — it includes the
+  // URL bar even while the bar is visible. That makes the body taller than
+  // the visible area, so the document scrolls even though every inner layer
+  // is `overflow-hidden`. Pin html/body to `overflow:hidden` for the lifetime
+  // of the shell so the page itself can never scroll. Landing renders outside
+  // Shell, so its own document-level scroll is unaffected.
+  useEffect(() => {
+    const html = document.documentElement;
+    const body = document.body;
+    const prevHtml = html.style.overflow;
+    const prevBody = body.style.overflow;
+    html.style.overflow = 'hidden';
+    body.style.overflow = 'hidden';
+    return () => {
+      html.style.overflow = prevHtml;
+      body.style.overflow = prevBody;
+    };
+  }, []);
   return (
     <div className="flex w-full h-screen overflow-hidden bg-dl-bg md:max-w-[880px] md:mx-auto md:shadow-[0_0_60px_rgba(15,23,42,0.06)]">
       {children}

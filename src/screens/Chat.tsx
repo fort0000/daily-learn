@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { Fragment, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { DL } from '../lib/dl';
 import { Phone } from '../components/Phone';
@@ -247,10 +247,152 @@ function Bubble({ m }: { m: Pick<ChatMessage, 'role' | 'content'> }) {
   return (
     <div className="flex gap-2 items-end">
       <AppIcon size={32} rounded="rounded-xl" />
-      <div className="bg-white text-dl-navy rounded-[18px_18px_18px_4px] px-3.5 py-2.5 max-w-[78%] text-[13px] leading-[1.6] font-jp font-semibold whitespace-pre-wrap border border-dl-border">
-        {m.content}
+      <div className="bg-white text-dl-navy rounded-[18px_18px_18px_4px] px-3.5 py-2.5 max-w-[78%] text-[13px] leading-[1.6] font-jp font-semibold border border-dl-border">
+        <Markdown text={m.content} />
       </div>
     </div>
+  );
+}
+
+type Block =
+  | { kind: 'h'; level: number; text: string }
+  | { kind: 'ul'; items: string[] }
+  | { kind: 'ol'; items: string[] }
+  | { kind: 'p'; text: string };
+
+function parseBlocks(input: string): Block[] {
+  const lines = input.replace(/\r\n?/g, '\n').split('\n');
+  const blocks: Block[] = [];
+  let para: string[] = [];
+  let list: { kind: 'ul' | 'ol'; items: string[] } | null = null;
+  const flushPara = () => {
+    if (para.length) {
+      blocks.push({ kind: 'p', text: para.join('\n') });
+      para = [];
+    }
+  };
+  const flushList = () => {
+    if (list) {
+      blocks.push(list);
+      list = null;
+    }
+  };
+  for (const raw of lines) {
+    const line = raw.replace(/\s+$/, '');
+    const heading = /^(#{1,6})\s+(.+)$/.exec(line);
+    const ul = /^\s*[-*+]\s+(.+)$/.exec(line);
+    const ol = /^\s*\d+[.)]\s+(.+)$/.exec(line);
+    if (heading) {
+      flushPara();
+      flushList();
+      blocks.push({ kind: 'h', level: Math.min(heading[1].length, 4), text: heading[2] });
+    } else if (ul) {
+      flushPara();
+      if (list?.kind !== 'ul') {
+        flushList();
+        list = { kind: 'ul', items: [] };
+      }
+      list.items.push(ul[1]);
+    } else if (ol) {
+      flushPara();
+      if (list?.kind !== 'ol') {
+        flushList();
+        list = { kind: 'ol', items: [] };
+      }
+      list.items.push(ol[1]);
+    } else if (line.trim() === '') {
+      flushPara();
+      flushList();
+    } else {
+      flushList();
+      para.push(line);
+    }
+  }
+  flushPara();
+  flushList();
+  return blocks;
+}
+
+// Inline markdown: **bold**, __bold__, *italic*, _italic_, `code`, ==highlight==, ~~strike~~
+function renderInline(text: string): ReactNode[] {
+  const pattern =
+    /(\*\*([^\*\n]+?)\*\*|__([^_\n]+?)__|`([^`\n]+?)`|==([^=\n]+?)==|~~([^~\n]+?)~~|\*([^\*\n]+?)\*|(?<![A-Za-z0-9])_([^_\n]+?)_(?![A-Za-z0-9]))/g;
+  const out: ReactNode[] = [];
+  let last = 0;
+  let key = 0;
+  let m: RegExpExecArray | null;
+  while ((m = pattern.exec(text)) !== null) {
+    if (m.index > last) out.push(text.slice(last, m.index));
+    if (m[2] || m[3]) out.push(<strong key={key++} className="font-black">{m[2] ?? m[3]}</strong>);
+    else if (m[4])
+      out.push(
+        <code key={key++} className="px-1 py-px rounded bg-[#FDF1DC] text-[12px] font-mono">
+          {m[4]}
+        </code>,
+      );
+    else if (m[5])
+      out.push(
+        <mark key={key++} className="bg-[#FEF3C7] text-dl-navy rounded px-0.5">
+          {m[5]}
+        </mark>,
+      );
+    else if (m[6]) out.push(<s key={key++}>{m[6]}</s>);
+    else if (m[7] || m[8]) out.push(<em key={key++}>{m[7] ?? m[8]}</em>);
+    last = pattern.lastIndex;
+  }
+  if (last < text.length) out.push(text.slice(last));
+  return out;
+}
+
+function renderInlineWithBreaks(text: string): ReactNode[] {
+  const parts = text.split('\n');
+  const out: ReactNode[] = [];
+  parts.forEach((part, i) => {
+    out.push(<Fragment key={`l${i}`}>{renderInline(part)}</Fragment>);
+    if (i < parts.length - 1) out.push(<br key={`br${i}`} />);
+  });
+  return out;
+}
+
+function Markdown({ text }: { text: string }) {
+  const blocks = parseBlocks(text);
+  if (blocks.length === 0) return null;
+  return (
+    <>
+      {blocks.map((b, i) => {
+        if (b.kind === 'h') {
+          const size = b.level <= 1 ? 'text-[15px]' : b.level === 2 ? 'text-[14px]' : 'text-[13px]';
+          return (
+            <div key={i} className={`${size} font-black mt-1 mb-1 first:mt-0`}>
+              {renderInline(b.text)}
+            </div>
+          );
+        }
+        if (b.kind === 'ul') {
+          return (
+            <ul key={i} className="list-disc pl-5 my-1 space-y-0.5">
+              {b.items.map((it, j) => (
+                <li key={j}>{renderInline(it)}</li>
+              ))}
+            </ul>
+          );
+        }
+        if (b.kind === 'ol') {
+          return (
+            <ol key={i} className="list-decimal pl-5 my-1 space-y-0.5">
+              {b.items.map((it, j) => (
+                <li key={j}>{renderInline(it)}</li>
+              ))}
+            </ol>
+          );
+        }
+        return (
+          <p key={i} className="my-1 first:mt-0 last:mb-0">
+            {renderInlineWithBreaks(b.text)}
+          </p>
+        );
+      })}
+    </>
   );
 }
 

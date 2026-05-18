@@ -69,6 +69,12 @@ type CourseCard = {
   palette: Palette;
 };
 
+// Remembers the carousel card the user last had in focus so navigating back
+// to /home (e.g., from Article via the back button, which doesn't carry
+// location.state) restores that card instead of snapping back to the first
+// one. The LessonCarousel writes to it whenever the active index changes.
+let lastFocusedCourseId: string | null = null;
+
 function buildCards(courses: Course[], lessonsByCourse: Map<string, Lesson[]>): CourseCard[] {
   const built: CourseCard[] = [];
   courses.forEach((course) => {
@@ -116,11 +122,14 @@ export function HomeScreen() {
   const navigate = useNavigate();
   // Article → CompleteModal → /home passes the just-completed course's id via
   // location.state so we can land on its carousel slot. Read once and clear so
-  // back-navigation doesn't keep re-focusing the same course.
-  const focusCourseId =
+  // back-navigation doesn't keep re-focusing the same course. When no state is
+  // carried (e.g., back button from Article), fall back to the last focused
+  // course the carousel saw, so the user lands on the card they were viewing.
+  const stateFocusCourseId =
     (location.state as { focusCourseId?: string } | null)?.focusCourseId ?? null;
+  const focusCourseId = stateFocusCourseId ?? lastFocusedCourseId;
   useEffect(() => {
-    if (focusCourseId) {
+    if (stateFocusCourseId) {
       navigate(location.pathname, { replace: true, state: null });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -333,6 +342,13 @@ function LessonCarousel({
   useEffect(() => {
     if (idx > cards.length - 1) setIdx(Math.max(0, cards.length - 1));
   }, [cards.length, idx]);
+
+  // Persist the focused course id so leaving and re-entering /home
+  // restores the same card (see lastFocusedCourseId at module scope).
+  useEffect(() => {
+    const focused = cards[idx];
+    if (focused) lastFocusedCourseId = focused.course.id;
+  }, [idx, cards]);
 
   const recenter = useCallback(() => {
     const viewport = viewportRef.current;

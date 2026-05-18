@@ -188,6 +188,19 @@ export async function fetchTotalCompleted(): Promise<number> {
   return count ?? 0;
 }
 
+// Course-scoped variant of fetchTotalCompleted. Used by CompleteModal where
+// "進捗 X / 30日" must reflect progress within the current course, not the
+// user's cross-course total.
+export async function fetchCourseCompleted(courseId: string): Promise<number> {
+  const { count, error } = await supabase
+    .from('lessons')
+    .select('id', { count: 'exact', head: true })
+    .eq('course_id', courseId)
+    .not('completed_at', 'is', null);
+  if (error) throw error;
+  return count ?? 0;
+}
+
 export async function getStreak(): Promise<Streak> {
   const { data, error } = await supabase.rpc('get_streak');
   if (error) throw error;

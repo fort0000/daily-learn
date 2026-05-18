@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { DL } from '../lib/dl';
 import { Phone } from '../components/Phone';
 import { StatusBar } from '../components/StatusBar';
-import { TabBar } from '../components/TabBar';
 import { PushButton } from '../components/PushButton';
 import { PlanLimitError, fetchActiveCourses, startCourseGeneration } from '../lib/db';
 import { useProfile, useSession } from '../lib/auth';
@@ -152,8 +151,6 @@ export function CreateScreen() {
           </PushButton>
         </div>
       </div>
-
-      <TabBar active="home" />
     </Phone>
   );
 }

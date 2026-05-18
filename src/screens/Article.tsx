@@ -9,8 +9,8 @@ import { CompleteModal } from '../components/CompleteModal';
 import { ChatScreen } from './Chat';
 import {
   PlanLimitError,
+  fetchCourseCompleted,
   fetchLesson,
-  fetchTotalCompleted,
   getCachedLessonBody,
   getStreak,
   markLessonComplete,
@@ -170,7 +170,7 @@ export function ArticleScreen() {
       // to lesson.day so the modal still has reasonable numbers.
       const [streakRes, totalRes] = await Promise.allSettled([
         getStreak(),
-        fetchTotalCompleted(),
+        fetchCourseCompleted(lesson.course_id),
       ]);
       const streak =
         streakRes.status === 'fulfilled' ? streakRes.value.current : lesson.day;

@@ -601,7 +601,14 @@ export function CompleteModal({
           <img
             src="/complete-progress-book.png"
             alt=""
-            style={{ width: 28, height: 22, objectFit: 'contain', flexShrink: 0 }}
+            style={{
+              width: 50,
+              height: 34,
+              objectFit: 'contain',
+              flexShrink: 0,
+              animation:
+                stage >= 4 ? 'dlTrophyBob 1.6s ease-in-out infinite' : 'none',
+            }}
           />
 
           <div style={{ textAlign: 'left', flex: 1 }}>

@@ -1,0 +1,539 @@
+================================================================================
+  DailyLearn アイコン画像生成プロンプト集
+================================================================================
+
+このファイルは、アプリで使用している画像アセットを「アプリ独自のテイスト」に
+差し替えるための画像生成プロンプトと、各アイコンの使用箇所をまとめたものです。
+
+推奨ツール:
+  - ChatGPT (gpt-image-1) … シリーズの統一感が出しやすい
+  - Recraft               … SVG 出力できるのでアイコン用途と相性◎
+  - Ideogram              … 数字・文字を含めたい場合に強い
+
+作業フロー:
+  1. 「マスタースタイル」をすべてのプロンプトの先頭に貼る
+  2. 各アイコンのプロンプトで個別の被写体を指示
+  3. 1024×1024 を生成 → sips / squoosh で各サイズへダウンサイズ
+  4. public/ 配下の同名ファイルを上書き(コード側の参照パスは変更不要)
+
+
+================================================================================
+  アプリ全体のデザイントーン(参考情報)
+================================================================================
+
+カラーパレット(tailwind.config.ts より):
+  cream       #FFF5E6   背景
+  bg          #FFFBF5   背景(より白寄り)
+  primary     #FF7A45   オレンジ(主役)
+  fire        #F97316   ファイア(連続記録の炎)
+  fire-dark   #EA580C
+  mint        #22C55E   ミント(達成・完了)
+  mint-dark   #16A34A
+  yellow      #FACC15   黄(差し色)
+  navy        #0F172A   濃紺(テキスト・アウトライン)
+  slate       #475569   サブテキスト
+
+雰囲気のキーワード:
+  - 丸い・ぽってり
+  - 太いアウトライン(ハンコ風)
+  - 縦に 3〜4px ずらした影(立体感のあるスタンプ風シャドウ)
+  - フラットだがほんのりグラデ
+  - 太字フォント(Nunito / Hiragino Sans)
+  - 日本語 UI / 学習・習慣化アプリ / Duolingo の和テイスト寄り
+
+
+================================================================================
+  マスタースタイル(全プロンプトの先頭に付与)
+================================================================================
+
+Flat vector illustration, friendly modern Japanese learning app icon style.
+Strong rounded shapes, thick navy outline (#0F172A, approx 6% of canvas width).
+Subtle warm gradient fill. Soft drop shadow offset down 4-6px, no blur,
+color #C8431A at 30% opacity (hanko / Japanese stamp feel).
+Palette strictly: warm orange #FF7A45 / fire #F97316 / mint #22C55E /
+cream #FFF5E6 / navy #0F172A / yellow accent #FACC15.
+No text, no letters, no Japanese characters. Centered subject with ~12% padding.
+CRITICAL — TRANSPARENT BACKGROUND: Output MUST be a PNG with an alpha channel.
+The entire background MUST be fully transparent (alpha = 0). Do NOT add a
+white, cream, or any solid-color background fill. Only the subject is
+visible; everything outside the subject silhouette is empty / alpha 0.
+1024x1024 square.
+Avoid: photorealism, 3D render, glossy material, gradient mesh, busy detail,
+white background, cream background, any solid background plate.
+
+
+================================================================================
+  1. アプリアイコン(マスター)
+================================================================================
+
+目的:
+  PWA / ホーム画面 / ファビコン / アプリ内のアプリアイコン表示すべての元データ。
+  まず 1024×1024 を作って、そこから各サイズに書き出すのが楽。
+
+使用箇所(コード):
+  public/icon-512.png         … PWA manifest 用
+  public/icon-192.png         … PWA manifest 用 + 後述の各コンポーネント
+  public/apple-touch-icon.png … iOS ホーム画面用(180×180)
+  src/components/AppIcon.tsx:10        →  src="/icon-192.png"
+  src/components/Flame.tsx:6           →  src="/icon-192.png"(連続記録の炎)
+  src/screens/Landing.tsx:435,1024,    →  src="/icon-192.png"
+                          1037,1044,
+                          1142
+
+書き出すサイズ:
+  512×512  → public/icon-512.png
+  192×192  → public/icon-192.png
+  180×180  → public/apple-touch-icon.png
+
+------------------------------------------------------------
+  案 A:本 + 炎(おすすめ。「学習 × 継続」が伝わる)
+------------------------------------------------------------
+
+保存先(マスター)  : public/icon-master.png   (1024×1024 で生成)
+書き出し先・ファイル名:
+  - public/icon-512.png         (512×512)
+  - public/icon-192.png         (192×192)
+  - public/apple-touch-icon.png (180×180)
+
+[マスタースタイル]
+
+Subject: a stylized open book at the bottom whose pages curl upward into a
+single warm flame. Book covers in mint #22C55E, pages in cream, flame in
+vertical gradient orange-to-yellow (#FF7A45 -> #FACC15) with a small inner
+highlight. Symmetric composition, mascot-friendly proportions.
+
+Background: fully transparent (alpha = 0). PNG with alpha channel. NO white,
+cream, or any solid-color background fill — only the subject is rendered.
+
+------------------------------------------------------------
+  案 B:炎リファイン(既存の炎モチーフを維持)
+------------------------------------------------------------
+
+保存先(マスター)  : public/icon-master.png   (1024×1024 で生成)
+書き出し先・ファイル名:
+  - public/icon-512.png         (512×512)
+  - public/icon-192.png         (192×192)
+  - public/apple-touch-icon.png (180×180)
+
+[マスタースタイル]
+
+Subject: a chunky single flame, mascot-friendly, slight upward tilt,
+with one small mint-green leaf (#22C55E) sprouting from the base.
+Flame body in vertical gradient #FF7A45 -> #FACC15.
+Thick navy outline only on outer silhouette, not on inner shapes.
+
+Background: fully transparent (alpha = 0). PNG with alpha channel. NO white,
+cream, or any solid-color background fill — only the subject is rendered.
+
+------------------------------------------------------------
+  案 C:マスコット路線(顔つきの炎キャラ)
+------------------------------------------------------------
+
+保存先(マスター)  : public/icon-master.png   (1024×1024 で生成)
+書き出し先・ファイル名:
+  - public/icon-512.png         (512×512)
+  - public/icon-192.png         (192×192)
+  - public/apple-touch-icon.png (180×180)
+
+[マスタースタイル]
+
+Subject: a friendly chubby flame mascot character, simple round black dot
+eyes, tiny smile, slight side tilt for personality. Body in vertical gradient
+#FF7A45 -> #FACC15. Optional: a small mint sparkle (#22C55E) floating near
+the top right. Squared-off chibi proportions, head-to-body ratio ~2:1.
+
+Background: fully transparent (alpha = 0). PNG with alpha channel. NO white,
+cream, or any solid-color background fill — only the subject is rendered.
+
+
+================================================================================
+  2. ファビコン(16×16 / 32×32)
+================================================================================
+
+目的:
+  ブラウザタブに表示される極小アイコン。アプリアイコンの細部はつぶれるので、
+  シルエットだけの簡素版を別途生成するのが綺麗。
+
+使用箇所:
+  public/favicon-16.png
+  public/favicon-32.png
+  (index.html の <link rel="icon"> から参照されている想定)
+
+書き出すサイズ:
+  32×32 / 16×16
+
+保存先(マスター)  : public/favicon-master.png  (256×256 程度で生成)
+書き出し先・ファイル名:
+  - public/favicon-32.png (32×32)
+  - public/favicon-16.png (16×16)
+
+プロンプト:
+
+[マスタースタイル]
+
+Subject: extremely simplified silhouette of a single flame for favicon use.
+Solid fill in #FF7A45 (no gradient, no inner detail). Single thick navy
+outline only on outer silhouette. Maximum readability at 16x16 pixels.
+No inner shapes, no eyes, no leaf.
+
+Background: fully transparent (alpha = 0). PNG with alpha channel. NO white,
+cream, or any solid-color background fill — only the subject is rendered.
+
+
+================================================================================
+  3. ランディングのヒーローイラスト
+================================================================================
+
+目的:
+  ランディングページ最上部の大きなビジュアル。情緒的にアプリを売り込む役目。
+
+使用箇所:
+  public/flame.png
+  src/screens/Landing.tsx:50    →  const FLAME_SRC = '/flame.png';
+  src/screens/Landing.tsx:302   →  <img src={FLAME_SRC} alt="" />
+  src/screens/Landing.tsx:1583  →  <img src={FLAME_SRC} alt="" />
+
+書き出すサイズ:
+  1536×1024 程度(横長)/ あるいは 1024×1024 でセンター配置
+
+保存先・ファイル名:
+  - public/flame.png  (生成サイズのまま、または 1536×1024 にリサイズ)
+
+プロンプト:
+
+[マスタースタイル]
+
+Subject: the DailyLearn mascot — a friendly chubby flame character with
+simple round eyes and a tiny smile, holding a small calendar or checklist
+showing checkmarks in mint #22C55E. Slight hanko stamp shadow underneath
+the character. Composition leaves headroom on the right for overlaid text.
+Mood: warm, encouraging, "let's keep the streak going".
+Canvas: 1536x1024.
+
+Background: fully transparent (alpha = 0). PNG with alpha channel. NO white,
+cream, or any solid-color background fill — only the subject is rendered.
+
+
+================================================================================
+  4. バッジアイコン(5 種)
+================================================================================
+
+目的:
+  プロフィール画面のバッジセクション。現在は絵文字(📚🔥💎🌟🏆)を直接描画
+  しているため、画像化することで一気にオリジナル感が出る。
+
+方針(重要):
+  バッジは「達成の象徴」として読ませたいので、マスコット(顔・目・表情・
+  キャラクター化)は使わない。炎・本・宝石・星・トロフィーなどはすべて
+  "pure symbol / emblem" として描く。プロンプトに "mascot" / "character" /
+  "eyes" / "smile" を入れないこと。
+
+使用箇所(コード):
+  src/screens/Profile.tsx:95-101
+    const badges: Badge[] = [
+      { icon: '📚', label: '初学習',     ... },
+      { icon: '🔥', label: '7日連続',    ... },
+      { icon: '💎', label: '30日連続',   ... },
+      { icon: '🌟', label: '50日連続',   ... },
+      { icon: '🏆', label: '100日連続',  ... },
+    ];
+  src/screens/Landing.tsx:1170-1188(ランディングのバッジ一覧モック)
+
+差し替え方針:
+  - public/badges/ ディレクトリを新設
+  - 各バッジを 512×512 で書き出し
+  - Profile.tsx の Badge 型に icon (絵文字) ではなく imageSrc を持たせる形に変更
+  - 数字付きバッジ(7/30/50/100)の数字は CSS でテキストオーバーレイした方が安全
+    (画像生成は数字が崩れやすいため、土台のみ生成)
+
+書き出すサイズ:
+  512×512 / 必要なら 256×256 も
+
+------------------------------------------------------------
+  4-1. 初学習バッジ → public/badges/badge-first.png
+------------------------------------------------------------
+
+保存先・ファイル名: public/badges/badge-first.png  (512×512)
+
+[マスタースタイル]
+
+Subject: a small chunky notebook with a sprouting mint leaf (#22C55E)
+emerging from the top, and a single yellow star (#FACC15) at the top right
+corner. Notebook cover in cream with a navy spine. Beginner / "first step"
+feeling. Circular composition fitting a 512x512 badge slot.
+
+Background: fully transparent (alpha = 0). PNG with alpha channel. NO white,
+cream, or any solid-color background fill — only the subject is rendered.
+
+------------------------------------------------------------
+  4-2. 7 日連続バッジ → public/badges/badge-7days.png
+------------------------------------------------------------
+
+保存先・ファイル名: public/badges/badge-7days.png  (512×512)
+
+[マスタースタイル]
+
+Subject: a single chunky flame shape (no face, no character features)
+encircled by seven small mint dots (#22C55E) arranged like a calendar
+week ring around it. Flame in vertical gradient #FF7A45 -> #FACC15
+with a thick navy outline. Pure symbol / emblem, not a character.
+No digits — the count is implied by the seven dots.
+Centered circular badge composition.
+
+Background: fully transparent (alpha = 0). PNG with alpha channel. NO white,
+cream, or any solid-color background fill — only the subject is rendered.
+
+------------------------------------------------------------
+  4-3. 30 日連続バッジ → public/badges/badge-30days.png
+------------------------------------------------------------
+
+保存先・ファイル名: public/badges/badge-30days.png  (512×512)
+
+[マスタースタイル]
+
+Subject: a faceted hexagonal gem in orange-to-yellow gradient
+(#FF7A45 -> #FACC15) with mint #22C55E highlights along the top facets,
+sitting on a small navy pedestal. Solid, achievement-tier feel.
+Centered circular badge composition.
+
+Background: fully transparent (alpha = 0). PNG with alpha channel. NO white,
+cream, or any solid-color background fill — only the subject is rendered.
+
+------------------------------------------------------------
+  4-4. 50 日連続バッジ → public/badges/badge-50days.png
+------------------------------------------------------------
+
+保存先・ファイル名: public/badges/badge-50days.png  (512×512)
+
+[マスタースタイル]
+
+Subject: a five-pointed star with a small flame at its center.
+Star fill in #FACC15, flame in #FF7A45 -> #F97316 gradient.
+Two small mint laurel leaves (#22C55E) on the lower left and lower right.
+Centered circular badge composition.
+
+Background: fully transparent (alpha = 0). PNG with alpha channel. NO white,
+cream, or any solid-color background fill — only the subject is rendered.
+
+------------------------------------------------------------
+  4-5. 100 日連続バッジ → public/badges/badge-100days.png
+------------------------------------------------------------
+
+保存先・ファイル名: public/badges/badge-100days.png  (512×512)
+
+[マスタースタイル]
+
+Subject: a chunky trophy cup with a flame burning inside the cup opening
+(replacing the usual empty interior). Trophy body in #FF7A45 -> #FACC15
+vertical gradient, flame in deeper #F97316 -> #FACC15. Two small mint
+ribbons (#22C55E) draped on either side of the base. Highest-tier feel.
+Centered circular badge composition.
+
+Background: fully transparent (alpha = 0). PNG with alpha channel. NO white,
+cream, or any solid-color background fill — only the subject is rendered.
+
+
+================================================================================
+  5. レッスン完了モーダルのイラスト
+================================================================================
+
+目的:
+  レッスン読了時に表示される祝祭モーダル(CompleteModal)。中央に大きく落ちて
+  くるトロフィーはモーダルの主役で、ここを画像化するとオリジナリティが一気に
+  立つ。同時に進捗チップの本アイコンも差し替え対象。
+
+方針(重要):
+  トロフィー・本・キラキラはいずれもマスコット化しない(顔・目・表情を
+  付けない)。"pure object / emblem" として描く。
+
+使用箇所(コード):
+  src/components/CompleteModal.tsx:381   →  🏆(中央のトロフィー / 主役)
+  src/components/CompleteModal.tsx:593   →  📚(下部「進捗」チップの本)
+  src/components/CompleteModal.tsx:321,  →  ✨ ⭐(周囲のキラキラ装飾)
+                                 332,
+                                 343,
+                                 354
+  src/components/CompleteModal.tsx:416   →  🎉(「おめでとう! 🎉」テキスト内)
+  src/components/CompleteModal.tsx:472   →  <Flame size={46}>(連続記録ロウ)
+                                            → /icon-192.png 経由
+  src/components/CompleteModal.tsx:563   →  <Flame size={14}>(+1 バッジ内の炎)
+                                            → /icon-192.png 経由
+
+差し替え方針:
+  - トロフィーは現在 96×96 の円形バッジに絵文字を centered している。
+    画像化する場合は背景の金色ラジアルグラデを生かす形で、トロフィー本体
+    のみ透過 PNG にして <img> で重ねるのがクリーン。
+  - もしくはトロフィー素材に背景の輝きも含めて 1 枚絵にして、CompleteModal
+    側の radial-gradient 円を撤去する方向もアリ。
+  - 本(📚)はサイズが 22px しかないので、シルエットがはっきり読める簡素な絵に。
+  - ✨ ⭐ 🎉 は装飾要素なので、絵文字のままでも十分機能する。
+    こだわるなら「キラキラ素材」だけは画像化してもよい(任意)。
+
+------------------------------------------------------------
+  5-1. トロフィー(主役)  →  public/complete-trophy.png
+------------------------------------------------------------
+
+書き出すサイズ:
+  1024×1024 マスター → 256×256 / 192×192(モーダル表示用)
+
+保存先・ファイル名: public/complete-trophy.png  (256×256 にリサイズ)
+
+プロンプト:
+
+[マスタースタイル]
+
+Subject: a chunky championship trophy cup as a pure object (no face,
+no character features), slight asymmetric tilt (~3deg right) to feel
+alive. Cup body in
+warm vertical gradient #FF7A45 -> #FACC15. Two side handles in slightly
+darker #EA580C. Pedestal in navy #0F172A. A small mint #22C55E ribbon
+or star detail on the front of the cup as the brand accent.
+Thick navy outline only on outer silhouette. The whole trophy should
+read clearly even at 96px display size.
+Centered, symmetric, ready to be placed as a "dropped in from above"
+celebration element.
+
+Background: fully transparent (alpha = 0). PNG with alpha channel. NO white,
+cream, or any solid-color background fill — only the subject is rendered.
+
+(オプション)背景込みで一枚にしたい場合は、末尾に追記:
+
+Add a soft radial glow background behind the trophy in yellow #FACC15
+fading to transparent. Background must remain transparent at the edges.
+
+------------------------------------------------------------
+  5-2. 進捗チップの本  →  public/complete-progress-book.png
+------------------------------------------------------------
+
+書き出すサイズ:
+  512×512 マスター → 64×64(表示は 22px だが Retina で 2〜3 倍を確保)
+
+保存先・ファイル名: public/complete-progress-book.png  (64×64 にリサイズ)
+
+プロンプト:
+
+[マスタースタイル]
+
+Subject: a tiny chunky open book seen from a slight three-quarter angle.
+Book covers in mint #22C55E, pages in cream #FFF5E6, navy spine.
+Extremely simple silhouette — must remain readable at 22 pixels.
+No text on pages, no decorative lines. Just the book shape.
+Thick navy outline only.
+
+Background: fully transparent (alpha = 0). PNG with alpha channel. NO white,
+cream, or any solid-color background fill — only the subject is rendered.
+
+------------------------------------------------------------
+  5-3. (任意)キラキラ素材  →  public/complete-sparkle.png
+------------------------------------------------------------
+
+絵文字 ✨ ⭐ を画像化したい場合のみ。アプリの色味に揃えると一体感が増す。
+
+書き出すサイズ:
+  256×256
+
+保存先・ファイル名: public/complete-sparkle.png  (256×256)
+
+プロンプト:
+
+[マスタースタイル]
+
+Subject: a four-point sparkle / star burst symbol. Bright yellow #FACC15
+core with a small white #FFFFFF inner highlight. Soft outer halo in
+#FACC15 at 30% opacity. No outline. Symmetric, centered.
+Used as a small decorative confetti element.
+
+Background: fully transparent (alpha = 0). PNG with alpha channel. NO white,
+cream, or any solid-color background fill — only the subject is rendered.
+(The halo fades smoothly into alpha 0; the canvas outside the halo must be
+fully transparent, not white.)
+
+------------------------------------------------------------
+  コード変更が必要な箇所(参考)
+------------------------------------------------------------
+
+トロフィーを画像化する場合(CompleteModal.tsx:359-383):
+
+  現状:
+    <div style={{ width: 96, height: 96, ..., fontSize: 52, ... }}>
+      🏆
+    </div>
+
+  変更後イメージ:
+    <div style={{ width: 96, height: 96, ..., padding: 8, ... }}>
+      <img
+        src="/complete-trophy.png"
+        alt=""
+        style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+      />
+    </div>
+
+  背景の金色ラジアルグラデと boxShadow を残すかどうかは、5-1 で
+  「背景込み」の絵を作ったかで判断。
+
+本を画像化する場合(CompleteModal.tsx:593):
+
+  現状:
+    <div style={{ fontSize: 22 }}>📚</div>
+
+  変更後:
+    <img
+      src="/complete-progress-book.png"
+      alt=""
+      style={{ width: 22, height: 22 }}
+    />
+
+
+================================================================================
+  生成後の後処理メモ
+================================================================================
+
+ダウンサイズ(macOS の sips を使う例):
+
+  # アプリアイコン
+  sips -z 512 512 master.png --out public/icon-512.png
+  sips -z 192 192 master.png --out public/icon-192.png
+  sips -z 180 180 master.png --out public/apple-touch-icon.png
+
+  # ファビコン(別途生成したシンプル版から)
+  sips -z 32 32 favicon-master.png --out public/favicon-32.png
+  sips -z 16 16 favicon-master.png --out public/favicon-16.png
+
+  # バッジ
+  sips -z 512 512 badge-first-master.png --out public/badges/badge-first.png
+  (以下同様)
+
+  # 完了モーダル
+  sips -z 256 256 trophy-master.png --out public/complete-trophy.png
+  sips -z 64 64 book-master.png    --out public/complete-progress-book.png
+
+確認:
+  - 透過 PNG として書き出されているか(背景が白塗りになっていないか)
+    確認コマンド:
+      sips -g hasAlpha path/to/image.png
+    → "hasAlpha: yes" でなければ NG(白背景のまま)。
+    その場合は再生成 or 画像編集ソフトで白を抜く。
+  - 16×16 でつぶれていないか、ブラウザタブで実際に確認
+  - ダークモード対応が必要なら、シルエットが薄背景でも視認できるか
+
+
+================================================================================
+  コード側の変更が必要になる箇所(参考)
+================================================================================
+
+ファイル同名上書きのみで済むもの:
+  - public/icon-192.png
+  - public/icon-512.png
+  - public/apple-touch-icon.png
+  - public/flame.png
+  - public/favicon-16.png
+  - public/favicon-32.png
+
+新規にコード変更が必要なもの:
+  - バッジを画像化する場合、src/screens/Profile.tsx:95-101 の Badge 型と
+    描画箇所 (Profile.tsx:171-189) を、絵文字描画から <img> 描画に変更
+  - 同様に src/screens/Landing.tsx:1170-1188 のバッジ一覧モックも更新
+  - 完了モーダルのトロフィー画像化は src/components/CompleteModal.tsx:381 を
+    <img> に置き換え、進捗チップの本画像化は同 593 行目を変更
+
+================================================================================

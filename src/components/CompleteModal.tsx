@@ -309,50 +309,54 @@ export function CompleteModal({
 
           {stage >= 3 && (
             <Fragment>
-              <div
+              <img
+                src="/complete-sparkle.png"
+                alt=""
                 style={{
                   position: 'absolute',
                   top: 0,
                   left: 60,
-                  fontSize: 22,
+                  width: 22,
+                  height: 22,
                   animation: 'dlSparkle 1600ms ease-in-out infinite',
                 }}
-              >
-                ✨
-              </div>
-              <div
+              />
+              <img
+                src="/complete-sparkle.png"
+                alt=""
                 style={{
                   position: 'absolute',
                   bottom: 4,
                   right: 50,
-                  fontSize: 18,
+                  width: 18,
+                  height: 18,
                   animation: 'dlSparkle 1600ms ease-in-out 400ms infinite',
                 }}
-              >
-                ✨
-              </div>
-              <div
+              />
+              <img
+                src="/complete-sparkle.png"
+                alt=""
                 style={{
                   position: 'absolute',
                   top: 20,
                   right: 40,
-                  fontSize: 14,
+                  width: 14,
+                  height: 14,
                   animation: 'dlSparkle 1600ms ease-in-out 800ms infinite',
                 }}
-              >
-                ⭐
-              </div>
-              <div
+              />
+              <img
+                src="/complete-sparkle.png"
+                alt=""
                 style={{
                   position: 'absolute',
                   top: 80,
                   left: 40,
-                  fontSize: 14,
+                  width: 14,
+                  height: 14,
                   animation: 'dlSparkle 1600ms ease-in-out 1100ms infinite',
                 }}
-              >
-                ✨
-              </div>
+              />
             </Fragment>
           )}
 
@@ -366,7 +370,7 @@ export function CompleteModal({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: 52,
+              padding: 10,
               boxShadow:
                 '0 10px 0 #92400E, 0 18px 32px rgba(245,158,11,0.55), inset 0 -8px 16px rgba(180,83,9,0.4), inset 0 6px 10px rgba(255,255,255,0.5)',
               position: 'relative',
@@ -378,7 +382,11 @@ export function CompleteModal({
               opacity: stage >= 2 ? 1 : 0,
             }}
           >
-            🏆
+            <img
+              src="/complete-trophy.png"
+              alt=""
+              style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+            />
           </div>
         </div>
 
@@ -590,7 +598,12 @@ export function CompleteModal({
             overflow: 'hidden',
           }}
         >
-          <div style={{ fontSize: 22 }}>📚</div>
+          <img
+            src="/complete-progress-book.png"
+            alt=""
+            style={{ width: 28, height: 22, objectFit: 'contain', flexShrink: 0 }}
+          />
+
           <div style={{ textAlign: 'left', flex: 1 }}>
             <div
               style={{
